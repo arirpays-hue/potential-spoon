@@ -10,7 +10,7 @@ endif
 
 include $(DEVKITPRO)/devkitARM/base_rules
 
-ARCH	:= -mthumb -march=armv5te -mtune=arm946es -ffast-math
+ARCH	:= -mthumb -march=armv5te -mtune=arm946e-s -ffast-math
 CFLAGS	:= -Wall -O2 $(ARCH) -I$(CURDIR)/$(INCLUDES)
 LDFLAGS	:= -specs=ds_arm9.specs $(ARCH)
 LIBS	:= -lnds9
