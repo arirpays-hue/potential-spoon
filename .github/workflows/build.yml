@@ -1,0 +1,22 @@
+name: Build Jumper DS 27 Worlds
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build NDS ROM
+        run: make
+
+      - name: Upload NDS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jumper_ds_27worlds
+          path: "*.nds"
+          
