@@ -76,7 +76,7 @@ int getRequiredBiomeForChar(int cIdx) {
     return 0;
 }
 
-// שמירה תקנית ובטוחה לכרטיס ה-SD באמצעות libfat (ללא גישה ל-0x0A000000 שגורמת לבאג המסך!)
+// שמירה תקנית ובטוחה לכרטיס ה-SD באמצעות libfat
 void savePermanentData(void) {
     if (!fatInitialized) return;
 
@@ -187,7 +187,7 @@ static void resetGame(void) {
     happyFaceTimer = 0;
     deathAnimTimer = 0;
 
-    pickNewTempMission(); // הגרלת משימה זמנית חדשה לסיבוב זה!
+    pickNewTempMission(); // יצירה פרוצדורלית של משימה חדשה לסיבוב זה!
 
     for (int c = 0; c < 3; c++) {
         smoothSkyTop[c] = (float)BIOMES[0].skyTop[c];
@@ -270,7 +270,7 @@ static void updateGamePhysics(void) {
         showBubble(BIOMES[currentBiomeIdx].nameHeb);
     }
 
-    // בדיקה בזמן אמת אם השחקן השלים את המשימה הזמנית (למשל הגיע לביומת הממתקים וזכה בראש עוגייה!)
+    // בדיקה בזמן אמת של מערכת המשימות הפרוצדורלית!
     checkMissionAndRecordUnlocks(dispScore, currentBiomeIdx, (dispScore > highScore));
 
     // מעבר הדרגתי ומציאותי בין צבעי הביומות (ללא מעבר "בבום"!)
@@ -281,7 +281,7 @@ static void updateGamePhysics(void) {
         smoothGround[c] += ((float)targetB->ground[c] - smoothGround[c]) * 0.025f;
     }
 
-    // האצה הדרגתית ומאתגרת ככל שמתקדמים בניקוד ובביומות (דורש אינסטינקט חד אך תמיד אפשרי!)
+    // האצה הדרגתית ומאתגרת ככל שמתקדמים בניקוד ובביומות
     float speedBonus = (dispScore < 1500) ? (dispScore * 0.0011f) : (1.65f + (dispScore - 1500) * 0.00035f);
     float biomeBoost = currentBiomeIdx * 0.04f;
     currentSpeed = 3.2f + speedBonus + biomeBoost;
@@ -315,6 +315,9 @@ static void updateGamePhysics(void) {
         player.grounded = false;
         player.jumpBuffer = 0;
         player.coyoteTimer = 0;
+        // השמעת הצליל הייחודי של הדמות שנבחרה ועדכון משימת קפיצות!
+        playCharacterVoiceSfx(selectedCharIdx);
+        notifyProceduralMissionEvent(dispScore, currentBiomeIdx, 0, 1, false);
     }
 
     int held = keysHeld();
@@ -420,17 +423,21 @@ static void updateGamePhysics(void) {
                 player.x + player.w - pad > obstacles[i].x + pad &&
                 player.y + pad < obstacles[i].y + obstacles[i].h - pad &&
                 player.y + player.h - pad > obstacles[i].y + pad) {
-          
+         
                 lastDeathObs = obstacles[i].type;
                 obstacles[i].hitAnimTimer = 1;
                 deathAnimTimer = 1;
 
-                if (lastDeathObs >= OBS_BIRD_START) {
+                bool isAirHit = (lastDeathObs >= OBS_BIRD_START);
+                if (isAirHit) {
                     playerAnimState = CHAR_ANIM_HIT_AIR;
                 } else {
                     playerAnimState = CHAR_ANIM_HIT_GROUND;
                 }
                 currentFaceExpr = EXPR_HURT;
+
+                // השמעת צליל פגיעה איכותי מותאם (קרקע לעומת אוויר)!
+                playHitSfx(isAirHit);
 
                 int finalSc = score / 10;
                 recordNewScore(finalSc, currentBiomeIdx);
@@ -444,16 +451,19 @@ static void updateGamePhysics(void) {
         }
     }
 
-    // תנועת מטבעות ואיסוף
+    // תנועת מטבעות ואיסוף + השמעת צליל ועדכון משימות פרוצדורליות!
     for (int i = 0; i < 6; i++) {
         if (coins[i].active) {
             coins[i].x -= currentSpeed;
             if (player.x < coins[i].x + 12 && player.x + player.w > coins[i].x &&
                 player.y < coins[i].y + 12 && player.y + player.h > coins[i].y) {
-                coinsCount += coins[i].value;
-                totalCoinsEarned += coins[i].value;
+                int val = coins[i].value;
+                coinsCount += val;
+                totalCoinsEarned += val;
                 happyFaceTimer = 45;
-                if (coins[i].value == 20) showBubble("יהלום!");
+                if (val == 20) showBubble("יהלום!");
+                playCoinSfx(val == 20);
+                notifyProceduralMissionEvent(dispScore, currentBiomeIdx, val, 0, false);
                 coins[i].active = false;
                 savePermanentData();
             } else if (coins[i].x < -20) {
@@ -495,7 +505,7 @@ static void updateGamePhysics(void) {
 }
 
 int main(void) {
-    // 1. הפעלה ואיפוס נקי של שני המסכים (מונע 100% מהפסים המשובשים!)
+    // 1. הפעלה ואיפוס נקי של שני המסכים
     powerOn(POWER_ALL_2D);
     lcdMainOnTop();
 
@@ -509,7 +519,6 @@ int main(void) {
     int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     u16* vramBottom = bgGetGfxPtr(bgSub);
 
-    // איפוס מלא של הבאפרים ושל ה-VRAM לפני הפריים הראשון
     for (int i = 0; i < 256 * 256; i++) {
         vramTop[i] = C16(15, 22, 42);
         vramBottom[i] = C16(15, 22, 42);
@@ -518,6 +527,7 @@ int main(void) {
     srand(time(NULL));
     unlockedChars[0] = true; // דמות ברירת מחדל פתוחה
     initDefaultCustomChar();
+    initProceduralAudio();   // אתחול מנוע המוזיקה הפרוצדורלית והסאונד!
 
     // 2. אתחול תקני של מערכת הקבצים בכרטיס (libfat) וטעינת השמירה
     fatInitialized = fatInitDefault();
@@ -606,6 +616,7 @@ int main(void) {
                         if (cIdx == CUSTOM_CHAR_IDX) {
                             if (customChar.created) {
                                 selectedCharIdx = CUSTOM_CHAR_IDX;
+                                playCharacterVoiceSfx(CUSTOM_CHAR_IDX);
                                 savePermanentData();
                             } else {
                                 gameState = STATE_CUSTOMIZE;
@@ -615,11 +626,13 @@ int main(void) {
                             if (bestBiomeIdx >= reqBiome) {
                                 if (unlockedChars[cIdx]) {
                                     selectedCharIdx = cIdx;
+                                    playCharacterVoiceSfx(cIdx); // משמיע את הצליל הייחודי של הדמות שנבחרה!
                                     savePermanentData();
                                 } else if (coinsCount >= CHARACTERS[cIdx].price) {
                                     coinsCount -= CHARACTERS[cIdx].price;
                                     unlockedChars[cIdx] = true;
                                     selectedCharIdx = cIdx;
+                                    playCharacterVoiceSfx(cIdx);
                                     savePermanentData();
                                 }
                             }
@@ -637,6 +650,9 @@ int main(void) {
                 }
             }
         }
+
+        // עדכון המוזיקה הפרוצדורלית וצלילי האפקטים בכל פריים!
+        updateProceduralAudio();
 
         // רינדור שני המסכים והעתקה ישירה ונקייה ל-VRAM בזמן VBlank
         renderTopScreen(topBuffer);
