@@ -7,9 +7,9 @@ $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>dev
 endif
 
 # These set the information text in the nds file
-#GAME_TITLE     := My Wonderful Homebrew
-#GAME_SUBTITLE1 := built with devkitARM
-#GAME_SUBTITLE2 := http://devitpro.org
+GAME_TITLE     := Jumper: 27 Worlds
+GAME_SUBTITLE1 := Adventure & 99 Heroes
+GAME_SUBTITLE2 := Nintendo DS Edition
 
 include $(DEVKITARM)/ds_rules
 
@@ -27,7 +27,7 @@ include $(DEVKITARM)/ds_rules
 TARGET   := $(shell basename $(CURDIR))
 BUILD    := build
 SOURCES  := source
-INCLUDES := include
+INCLUDES := include source
 DATA     := data
 GRAPHICS :=
 AUDIO    :=
@@ -51,7 +51,7 @@ LDFLAGS   = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project (order is important)
 #---------------------------------------------------------------------------------
-LIBS := -lnds9
+LIBS := -lfat -lnds9
 
 # automatigically add libraries for NitroFS
 ifneq ($(strip $(NITRO)),)
@@ -74,6 +74,11 @@ LIBDIRS := $(LIBNDS) $(PORTLIBS)
 #---------------------------------------------------------------------------------
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
+
+# יצירה אוטומטית של סמל המשחק (icon.bmp 32x32) אם אינו קיים עדיין בתיקייה
+ifeq ($(wildcard $(CURDIR)/icon.bmp),)
+  $(shell python3 -c 'import struct; w,h=32,32; pal=[0]*16; pal[1]=0x3A1808; pal[2]=0xFFE030; pal[3]=0xE83020; pal[4]=0xF8C890; pal[5]=0xFFFFFF; pal[6]=0x20C840; px=[]; [px.extend([6 if y<5 else (2 if (x-16)**2+(y-16)**2<=120 and (x-16)**2+(y-16)**2>=75 else (3 if 11<=x<=20 and 18<=y<=24 else (4 if 11<=x<=20 and 10<=y<=17 else (5 if (x in (13,18) and y==14) else 1)))) for x in range(w)]) for y in range(h)]; raw=bytearray([((px[y*w+x]<<4)|px[y*w+x+1]) for y in range(h) for x in range(0,w,2)]); hdr=struct.pack("<2sIHHIiiiHHIIIIII",b"BM",54+64+len(raw),0,0,118,40,w,h,1,4,0,len(raw),2835,2835,16,16); pal_b=b"".join(struct.pack("<I",c) for c in pal); open("$(CURDIR)/icon.bmp","wb").write(hdr+pal_b+raw)' 2>/dev/null)
+endif
 
 export OUTPUT := $(CURDIR)/$(TARGET)
 
@@ -165,7 +170,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds $(SOUNDBANK)
+	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds $(SOUNDBANK) icon.bmp
 
 #---------------------------------------------------------------------------------
 else
