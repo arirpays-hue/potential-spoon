@@ -265,25 +265,28 @@ void renderBottomScreen(u16* buf) {
         drawHebrewString(buf, 216, 165, "הבא", white, 1);
 
     } else if (gameState == STATE_DETAILS) {
-        // מסך פרטים וטבלת כל השיאים שנשמרים לתמיד!
-        drawHebrewString(buf, 128, 10, "הרפתקאות הקופץ", yellow, 2);
-        drawHebrewString(buf, 128, 30, "שיאים שנשמרו לתמיד:", green, 1);
+        // מסך פרטים, שיאים ונתוני מטבעות שהורווחו ונשמרו לתמיד!
+        drawHebrewString(buf, 128, 8, "הרפתקאות הקופץ", yellow, 2);
+        drawHebrewString(buf, 128, 28, "שיאים ומטבעות שנשמרו:", green, 1);
 
         // מסגרת טבלת 3 השיאים הגדולים
-        drawRect(buf, 18, 44, 220, 62, C16(25, 35, 58));
+        drawRect(buf, 18, 40, 220, 54, C16(25, 35, 58));
 
-        drawHebrewString(buf, 175, 50, "מקום ראשון:", yellow, 1);
-        drawNumber(buf, 65, 50, topScores[0], yellow, 1);
+        drawHebrewString(buf, 175, 45, "מקום ראשון:", yellow, 1);
+        drawNumber(buf, 65, 45, topScores[0], yellow, 1);
 
-        drawHebrewString(buf, 175, 68, "מקום שני:", C16(200, 210, 225), 1);
-        drawNumber(buf, 65, 68, topScores[1], C16(200, 210, 225), 1);
+        drawHebrewString(buf, 175, 61, "מקום שני:", C16(200, 210, 225), 1);
+        drawNumber(buf, 65, 61, topScores[1], C16(200, 210, 225), 1);
 
-        drawHebrewString(buf, 175, 86, "מקום שלישי:", C16(215, 145, 75), 1);
-        drawNumber(buf, 65, 86, topScores[2], C16(215, 145, 75), 1);
+        drawHebrewString(buf, 175, 77, "מקום שלישי:", C16(215, 145, 75), 1);
+        drawNumber(buf, 65, 77, topScores[2], C16(215, 145, 75), 1);
 
-        // הצגת שיא הביומה הרחוקה ביותר ומספר המשחקים ששוחקו
-        drawHebrewString(buf, 175, 114, "שיא עולם:", white, 1);
-        drawHebrewString(buf, 75,  114, BIOMES[bestBiomeIdx].nameHeb, green, 1);
+        // הצגת נתוני מטבעות שהורווחו, שיא עולם ומספר משחקים
+        drawHebrewString(buf, 175, 100, "מטבעות שהורווחו:", yellow, 1);
+        drawNumber(buf, 55, 100, totalCoinsEarned, yellow, 1);
+
+        drawHebrewString(buf, 175, 116, "שיא עולם:", white, 1);
+        drawHebrewString(buf, 75,  116, BIOMES[bestBiomeIdx].nameHeb, green, 1);
 
         drawHebrewString(buf, 175, 132, "משחקים:", white, 1);
         drawNumber(buf, 65, 132, totalGamesPlayed, blue, 1);
@@ -293,4 +296,3 @@ void renderBottomScreen(u16* buf) {
         drawHebrewString(buf, 128, 160, "סגור", white, 2);
     }
 }
- 
