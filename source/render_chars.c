@@ -52,47 +52,36 @@ static void drawDynamicFace(u16* buf, int cx, int y, int s, u16 pupilCol, enum F
     u16 irisCol  = (pupilCol == black) ? C16(55, 125, 215) : pupilCol;
 
     // 1. הבעת כאב/הלם ריאליסטית בפגיעה (EXPR_HURT):
-    // עין שמאל עצומה בכיווץ חד (>), עין ימין מכווצת (<) עם דמעה נוצצת, גבות כואבות ופה חורק שיניים!
     if (expr == EXPR_HURT) {
-        // גבות מכווצות בכאב
         drawLine(buf, cx - 6 * s, y - 3 * s, cx - 2 * s, y - 1 * s, browCol);
         drawLine(buf, cx + 6 * s, y - 3 * s, cx + 2 * s, y - 1 * s, browCol);
-        // עיניים מכווצות (> <)
         drawLine(buf, cx - 6 * s, y - 1 * s, cx - 2 * s, y + 1 * s, black);
         drawLine(buf, cx - 2 * s, y + 1 * s, cx - 6 * s, y + 3 * s, black);
         drawLine(buf, cx + 6 * s, y - 1 * s, cx + 2 * s, y + 1 * s, black);
         drawLine(buf, cx + 2 * s, y + 1 * s, cx + 6 * s, y + 3 * s, black);
-        // דמעה קטנה בקצה העין
         drawRect(buf, cx + 6 * s, y + 2 * s, 2 * s, 2 * s, cyan);
         drawRect(buf, cx + 6 * s, y + 2 * s, 1 * s, 1 * s, white);
-        // פה פעור בכאב עם שיניים חשופות ולשון
         drawRoundedPart(buf, cx - 4 * s, y + 4 * s, 8 * s, 5 * s, darkMouth, red, black);
-        drawRect(buf, cx - 3 * s, y + 5 * s, 6 * s, 1 * s, white); // שורת שיניים עליונה
+        drawRect(buf, cx - 3 * s, y + 5 * s, 6 * s, 1 * s, white);
         drawRect(buf, cx - 2 * s, y + 7 * s, 4 * s, 1 * s, tongue);
         return;
     }
 
     // 2. הבעה מפוחדת ריאליסטית כשמתקרבת מפלצת (EXPR_SCARED):
-    // גבות מודאגות אלכסוניות, לובן עין מוגדל, אישונים מכווצים רועדים, פה רועד עם שיניים וטיפת זיעה!
     if (expr == EXPR_SCARED) {
         int jitter = (frameCnt / 2) % 2;
-        // גבות מורמות באלכסון של דאגה ופחד
         drawLine(buf, cx - 6 * s, y - 1 * s, cx - 2 * s, y - 3 * s, browCol);
         drawLine(buf, cx + 2 * s, y - 3 * s, cx + 6 * s, y - 1 * s, browCol);
-        // עיניים פעורות לרווחה עם מסגרת ריסים ואישון מכווץ רועד
         drawBoxOut(buf, cx - 6 * s, y - 1 * s, 5 * s, 5 * s, white, black);
         drawBoxOut(buf, cx + 1 * s, y - 1 * s, 5 * s, 5 * s, white, black);
         drawRect(buf, cx - (4 - jitter) * s, y + 1 * s, 2 * s, 2 * s, irisCol);
         drawRect(buf, cx + (2 + jitter) * s, y + 1 * s, 2 * s, 2 * s, irisCol);
         drawRect(buf, cx - (4 - jitter) * s, y + 1 * s, 1 * s, 1 * s, black);
         drawRect(buf, cx + (2 + jitter) * s, y + 1 * s, 1 * s, 1 * s, black);
-        // אף קטן
         drawRect(buf, cx, y + 3 * s, 1 * s, 1 * s, noseShd);
-        // פה פעור בפחד עם שיניים רועדות
         drawRoundedPart(buf, cx - 4 * s, y + 4 * s, 8 * s, 5 * s, darkMouth, red, black);
         drawRect(buf, cx - 3 * s, y + 5 * s, 6 * s, 1 * s, white);
         drawRect(buf, cx - 3 * s, y + 7 * s, 6 * s, 1 * s, white);
-        // טיפת זיעה ריאליסטית עם ברק לבן בצד הרקה
         int dropY = (frameCnt / 4) % 3;
         drawRect(buf, cx + 7 * s, y - (2 - dropY) * s, 2 * s, 4 * s, cyan);
         drawRect(buf, cx + 7 * s, y - (2 - dropY) * s, 1 * s, 1 * s, white);
@@ -100,21 +89,16 @@ static void drawDynamicFace(u16* buf, int cx, int y, int s, u16 pupilCol, enum F
     }
 
     // 3. הבעה שמחה וקורנת באיסוף מטבע/יהלום (EXPR_HAPPY):
-    // גבות קשתיות שמחות, עיניים מחייכות קמורות עם ריסים, לחיים סמוקות וחיוך רחב עם שיניים ולשון!
     if (expr == EXPR_HAPPY) {
-        // גבות מורמות בשמחה
         drawLine(buf, cx - 6 * s, y - 2 * s, cx - 2 * s, y - 3 * s, browCol);
         drawLine(buf, cx + 2 * s, y - 3 * s, cx + 6 * s, y - 2 * s, browCol);
-        // קשתות עיניים צוחקות מעוגלות
         drawLine(buf, cx - 6 * s, y + 1 * s, cx - 4 * s, y - 1 * s, black);
         drawLine(buf, cx - 4 * s, y - 1 * s, cx - 2 * s, y + 1 * s, black);
         drawLine(buf, cx + 2 * s, y + 1 * s, cx + 4 * s, y - 1 * s, black);
         drawLine(buf, cx + 4 * s, y - 1 * s, cx + 6 * s, y + 1 * s, black);
-        // לחיים סמוקות ואף
         drawRect(buf, cx - 7 * s, y + 2 * s, 2 * s, 2 * s, blush);
         drawRect(buf, cx + 5 * s, y + 2 * s, 2 * s, 2 * s, blush);
         drawRect(buf, cx, y + 2 * s, 1 * s, 1 * s, noseShd);
-        // חיוך רחב פתוח עם שיניים לבנות ולשון ורודה
         drawRoundedPart(buf, cx - 4 * s, y + 3 * s, 8 * s, 5 * s, darkMouth, red, black);
         drawRect(buf, cx - 3 * s, y + 4 * s, 6 * s, 1 * s, white);
         drawRect(buf, cx - 2 * s, y + 6 * s, 4 * s, 1 * s, tongue);
@@ -122,26 +106,21 @@ static void drawDynamicFace(u16* buf, int cx, int y, int s, u16 pupilCol, enum F
     }
 
     // 4. הבעה רגילה ריאליסטית וחיה (EXPR_NORMAL):
-    // כוללת מצמוץ עפעפיים טבעי כל כמה שניות, גבות, לובן עין, קשתית צבעונית, אישון, ניצוץ אור, אף וחיוך!
     bool blinking = ((frameCnt % 110) >= 105);
 
-    // גבות טבעיות מעל העיניים
     drawRect(buf, cx - 5 * s, y - 2 * s, 4 * s, 1 * s, browCol);
     drawRect(buf, cx + 2 * s, y - 2 * s, 4 * s, 1 * s, browCol);
 
     if (blinking) {
-        // מצמוץ עפעפיים טבעי
         drawRect(buf, cx - 5 * s, y + 1 * s, 4 * s, 1 * s, black);
         drawRect(buf, cx + 2 * s, y + 1 * s, 4 * s, 1 * s, black);
     } else {
-        // עין שמאל: קו ריסים עליון, לובן עין, קשתית צבעונית, אישון וניצוץ לבן
         drawRect(buf, cx - 5 * s, y - 1 * s, 4 * s, 1 * s, black);
         drawRect(buf, cx - 5 * s, y,         4 * s, 3 * s, sclera);
         drawRect(buf, cx - 4 * s, y,         3 * s, 3 * s, irisCol);
         drawRect(buf, cx - 3 * s, y + 1 * s, 2 * s, 2 * s, black);
         drawRect(buf, cx - 4 * s, y,         1 * s, 1 * s, white);
 
-        // עין ימין: קו ריסים עליון, לובן עין, קשתית צבעונית, אישון וניצוץ לבן
         drawRect(buf, cx + 2 * s, y - 1 * s, 4 * s, 1 * s, black);
         drawRect(buf, cx + 2 * s, y,         4 * s, 3 * s, sclera);
         drawRect(buf, cx + 3 * s, y,         3 * s, 3 * s, irisCol);
@@ -149,15 +128,18 @@ static void drawDynamicFace(u16* buf, int cx, int y, int s, u16 pupilCol, enum F
         drawRect(buf, cx + 3 * s, y,         1 * s, 1 * s, white);
     }
 
-    // גשר אף עדין וחיוך שפתיים טבעי עם זווית חיוך
     drawRect(buf, cx, y + 2 * s, 1 * s, 2 * s, noseShd);
     drawRect(buf, cx - 2 * s, y + 5 * s, 4 * s, 1 * s, C16(175, 70, 65));
     drawRect(buf, cx - 3 * s, y + 4 * s, 1 * s, 1 * s, C16(175, 70, 65));
     drawRect(buf, cx + 2 * s, y + 4 * s, 1 * s, 1 * s, C16(175, 70, 65));
 }
 
-// הפונקציה המלאה שמציירת כל דמות בצורה עגולה ומפורטת + 4 אנימציות ייחודיות + הבעות פנים ריאליסטיות!
+// הפונקציה המלאה שמציירת כל דמות בצורה עגולה ומפורטת + תמיכה בדמות בהרכבה אישית!
 void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, enum CharAnimState animState, enum FaceExpr faceExpr, int angle, int frameCnt) {
+    if (charIdx == CUSTOM_CHAR_IDX) {
+        drawCustomCharacterSprite(buf, cx, cy, scalePct, animState, faceExpr, frameCnt);
+        return;
+    }
     if (charIdx < 0 || charIdx >= NUM_CHARS) charIdx = 0;
     const CharData* ch = &CHARACTERS[charIdx];
     int s = (scalePct >= 120) ? 2 : 1;
@@ -170,12 +152,8 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     u16 red     = C16(235, 35, 35);
     u16 silver  = C16(205, 215, 230);
 
-    // האם הדמות רצה כרגע או עומדת במקום (בעצירה / בתפריט הראשי השחקן עומד יציב ולא מזיז רגליים!)
     bool isWalkingActive = (gameState == STATE_PLAYING || gameState == STATE_SHOP);
 
-    // =========================================================================
-    // חישוב 4 האנימציות הייחודיות לכל דמות לפי הסגנון והמאפיינים שלה!
-    // =========================================================================
     int legOffL = 0, legOffR = 0;
     int armOffY = 0, armSpread = 0;
     int bodyBobY = 0, bodyShiftX = 0;
@@ -183,7 +161,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
 
     if (animState == CHAR_ANIM_WALK) {
         if (isWalkingActive) {
-            // 1. אנימציית הליכה/ריצה ייחודית לכל דמות!
             int phase = (frameCnt / 3) % 4;
             int stride = 4;
             if (ch->style == STYLE_SPIN) {
@@ -211,7 +188,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
             if (bodyBobY == 0) bodyBobY = (phase % 2 == 0) ? -1 : 1;
         }
     } else if (animState == CHAR_ANIM_JUMP) {
-        // 2. אנימציית קפיצה ייחודית לכל דמות!
         if (ch->style == STYLE_SPIN) {
             int spinDir = (frameCnt / 2) % 4;
             bodyBobY = (spinDir % 2 == 0) ? -3 : 2;
@@ -245,7 +221,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         }
 
     } else if (animState == CHAR_ANIM_HIT_GROUND) {
-        // 3. אנימציית פגיעה באויב קרקע / היתקלות באבן: הדפה אחורה, רטט וכוכבי סחרחורת!
         bodyShiftX = -3 + ((frameCnt % 2) * 3);
         bodyBobY = -1;
         headTiltX = -3;
@@ -256,7 +231,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         faceExpr = EXPR_HURT;
 
     } else if (animState == CHAR_ANIM_HIT_AIR) {
-        // 4. אנימציית פגיעה מאויב מעופף: התכווצות והדפה כלפי מטה + ניצוצות פגיעה מלמעלה!
         bodyShiftX = ((frameCnt % 2) == 0) ? -2 : 2;
         bodyBobY = 4;
         headBobY = 3;
@@ -353,12 +327,12 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         u16 headCol = (charIdx == 17) ? skin : ch->mainColor;
         drawBoxOut(buf, x - 8 * s, y - 17 * s + headBobY * s, 16 * s, 14 * s, headCol, black);
 
-        if (charIdx == 17) { // סטיב + מכוש יהלום
+        if (charIdx == 17) {
             drawBoxOut(buf, x - 8 * s, y - 17 * s + headBobY * s, 16 * s, 5 * s, C16(95, 60, 35), black);
             drawDynamicFace(buf, x, y - 11 * s + headBobY * s, s, C16(50, 80, 200), faceExpr, frameCnt);
             drawLine(buf, x + 8 * s, y + 2 * s, x + 14 * s, y - 8 * s, C16(130, 85, 40));
             drawLine(buf, x + 11 * s, y - 10 * s, x + 16 * s, y - 6 * s, C16(0, 240, 255));
-        } else if (charIdx == 16 && faceExpr == EXPR_NORMAL) { // קריפר
+        } else if (charIdx == 16 && faceExpr == EXPR_NORMAL) {
             drawRect(buf, x - 5 * s, y - 13 * s, 3 * s, 3 * s, black);
             drawRect(buf, x + 2 * s, y - 13 * s, 3 * s, 3 * s, black);
             drawRect(buf, x - 2 * s, y - 10 * s, 4 * s, 4 * s, black);
@@ -371,7 +345,7 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         goto draw_hit_fx;
     }
 
-    // 5. חיות פרוותיות ומעוגלות (חתול, כלב, פנדה, שועל, אריה, נמר, ארנב, חד קרן):
+    // 5. חיות פרוותיות ומעוגלות:
     if (ch->shape == SHAPE_ANIMAL_EARS) {
         drawCircle(buf, x - 10 * s, y + 2 * s, 4 * s, black);
         drawCircle(buf, x - 10 * s, y + 2 * s, 3 * s, ch->subColor);
@@ -381,7 +355,7 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         int hx = x + headTiltX * s;
         int hy = y - 10 * s + headBobY * s;
 
-        if (charIdx == 49) { // רעמת אריה עגולה
+        if (charIdx == 49) {
             drawCircle(buf, hx, hy, 11 * s, black);
             drawCircle(buf, hx, hy, 10 * s, C16(175, 85, 20));
         }
@@ -488,7 +462,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         goto draw_hit_fx;
     }
 
-    // ציור הפנים הריאליסטיות לכל שאר הדמויות
     drawDynamicFace(buf, hx, hy - 2 * s, s, black, faceExpr, frameCnt);
 
     if (charIdx == 5 || charIdx == 82 || charIdx == 83) {
