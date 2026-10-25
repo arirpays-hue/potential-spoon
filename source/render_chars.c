@@ -37,70 +37,126 @@ static void drawRoundedPart(u16* buf, int x, int y, int w, int h, u16 fill, u16 
     }
 }
 
-// ציור 4 הבעות פנים דינמיות ומשתנות לכל 99 הדמויות!
+// ציור הבעות פנים ריאליסטיות, חיות ומפורטות לכל 99 הדמויות!
 static void drawDynamicFace(u16* buf, int cx, int y, int s, u16 pupilCol, enum FaceExpr expr, int frameCnt) {
-    u16 white = C16(255, 255, 255);
-    u16 black = C16(18, 18, 24);
-    u16 red   = C16(235, 45, 45);
-    u16 cyan  = C16(80, 220, 255);
+    u16 white    = C16(255, 255, 255);
+    u16 sclera   = C16(240, 245, 252);
+    u16 black    = C16(18, 18, 24);
+    u16 browCol  = C16(55, 38, 28);
+    u16 red      = C16(225, 40, 45);
+    u16 darkMouth= C16(95, 20, 25);
+    u16 tongue   = C16(255, 115, 135);
+    u16 blush    = C16(255, 145, 160);
+    u16 noseShd  = C16(205, 145, 100);
+    u16 cyan     = C16(80, 220, 255);
+    u16 irisCol  = (pupilCol == black) ? C16(55, 125, 215) : pupilCol;
 
+    // 1. הבעת כאב/הלם ריאליסטית בפגיעה (EXPR_HURT):
+    // עין שמאל עצומה בכיווץ חד (>), עין ימין מכווצת (<) עם דמעה נוצצת, גבות כואבות ופה חורק שיניים!
     if (expr == EXPR_HURT) {
-        // הבעת כאב/הלם בפגיעה: עיני X ופה פעור רועד!
-        drawLine(buf, cx - 6 * s, y - 1 * s, cx - 2 * s, y + 3 * s, black);
-        drawLine(buf, cx - 2 * s, y - 1 * s, cx - 6 * s, y + 3 * s, black);
-        drawLine(buf, cx + 2 * s, y - 1 * s, cx + 6 * s, y + 3 * s, black);
-        drawLine(buf, cx + 6 * s, y - 1 * s, cx + 2 * s, y + 3 * s, black);
-        drawRoundedPart(buf, cx - 3 * s, y + 4 * s, 6 * s, 4 * s, red, white, black);
+        // גבות מכווצות בכאב
+        drawLine(buf, cx - 6 * s, y - 3 * s, cx - 2 * s, y - 1 * s, browCol);
+        drawLine(buf, cx + 6 * s, y - 3 * s, cx + 2 * s, y - 1 * s, browCol);
+        // עיניים מכווצות (> <)
+        drawLine(buf, cx - 6 * s, y - 1 * s, cx - 2 * s, y + 1 * s, black);
+        drawLine(buf, cx - 2 * s, y + 1 * s, cx - 6 * s, y + 3 * s, black);
+        drawLine(buf, cx + 6 * s, y - 1 * s, cx + 2 * s, y + 1 * s, black);
+        drawLine(buf, cx + 2 * s, y + 1 * s, cx + 6 * s, y + 3 * s, black);
+        // דמעה קטנה בקצה העין
+        drawRect(buf, cx + 6 * s, y + 2 * s, 2 * s, 2 * s, cyan);
+        drawRect(buf, cx + 6 * s, y + 2 * s, 1 * s, 1 * s, white);
+        // פה פעור בכאב עם שיניים חשופות ולשון
+        drawRoundedPart(buf, cx - 4 * s, y + 4 * s, 8 * s, 5 * s, darkMouth, red, black);
+        drawRect(buf, cx - 3 * s, y + 5 * s, 6 * s, 1 * s, white); // שורת שיניים עליונה
+        drawRect(buf, cx - 2 * s, y + 7 * s, 4 * s, 1 * s, tongue);
         return;
     }
 
+    // 2. הבעה מפוחדת ריאליסטית כשמתקרבת מפלצת (EXPR_SCARED):
+    // גבות מודאגות אלכסוניות, לובן עין מוגדל, אישונים מכווצים רועדים, פה רועד עם שיניים וטיפת זיעה!
     if (expr == EXPR_SCARED) {
-        // הבעה מפוחדת כשמתקרבת מפלצת: עיניים קרועות לרווחה, אישונים מכווצים רועדים, פה פעור וטיפת זיעה!
         int jitter = (frameCnt / 2) % 2;
-        drawRect(buf, cx - 6 * s, y - 1 * s, 4 * s, 5 * s, white);
-        drawRect(buf, cx + 2 * s, y - 1 * s, 4 * s, 5 * s, white);
-        drawRect(buf, cx - (4 + jitter) * s, y + 1 * s, 2 * s, 2 * s, black);
-        drawRect(buf, cx + (3 + jitter) * s, y + 1 * s, 2 * s, 2 * s, black);
-        // גבות מורמות בפחד
-        drawLine(buf, cx - 6 * s, y - 2 * s, cx - 3 * s, y - 3 * s, black);
-        drawLine(buf, cx + 3 * s, y - 3 * s, cx + 6 * s, y - 2 * s, black);
-        // פה פעור באימה
-        drawCircle(buf, cx, y + 5 * s, 2 * s, black);
-        drawCircle(buf, cx, y + 5 * s, 1 * s, red);
-        // טיפת זיעה תכלת בצד המצח
+        // גבות מורמות באלכסון של דאגה ופחד
+        drawLine(buf, cx - 6 * s, y - 1 * s, cx - 2 * s, y - 3 * s, browCol);
+        drawLine(buf, cx + 2 * s, y - 3 * s, cx + 6 * s, y - 1 * s, browCol);
+        // עיניים פעורות לרווחה עם מסגרת ריסים ואישון מכווץ רועד
+        drawBoxOut(buf, cx - 6 * s, y - 1 * s, 5 * s, 5 * s, white, black);
+        drawBoxOut(buf, cx + 1 * s, y - 1 * s, 5 * s, 5 * s, white, black);
+        drawRect(buf, cx - (4 - jitter) * s, y + 1 * s, 2 * s, 2 * s, irisCol);
+        drawRect(buf, cx + (2 + jitter) * s, y + 1 * s, 2 * s, 2 * s, irisCol);
+        drawRect(buf, cx - (4 - jitter) * s, y + 1 * s, 1 * s, 1 * s, black);
+        drawRect(buf, cx + (2 + jitter) * s, y + 1 * s, 1 * s, 1 * s, black);
+        // אף קטן
+        drawRect(buf, cx, y + 3 * s, 1 * s, 1 * s, noseShd);
+        // פה פעור בפחד עם שיניים רועדות
+        drawRoundedPart(buf, cx - 4 * s, y + 4 * s, 8 * s, 5 * s, darkMouth, red, black);
+        drawRect(buf, cx - 3 * s, y + 5 * s, 6 * s, 1 * s, white);
+        drawRect(buf, cx - 3 * s, y + 7 * s, 6 * s, 1 * s, white);
+        // טיפת זיעה ריאליסטית עם ברק לבן בצד הרקה
         int dropY = (frameCnt / 4) % 3;
-        drawRect(buf, cx + 7 * s, y - (2 - dropY) * s, 2 * s, 3 * s, cyan);
+        drawRect(buf, cx + 7 * s, y - (2 - dropY) * s, 2 * s, 4 * s, cyan);
+        drawRect(buf, cx + 7 * s, y - (2 - dropY) * s, 1 * s, 1 * s, white);
         return;
     }
 
+    // 3. הבעה שמחה וקורנת באיסוף מטבע/יהלום (EXPR_HAPPY):
+    // גבות קשתיות שמחות, עיניים מחייכות קמורות עם ריסים, לחיים סמוקות וחיוך רחב עם שיניים ולשון!
     if (expr == EXPR_HAPPY) {
-        // הבעה שמחה ומנצחת באיסוף מטבע/יהלום: עיניים שמחות קמורות וחיוך רחב!
+        // גבות מורמות בשמחה
+        drawLine(buf, cx - 6 * s, y - 2 * s, cx - 2 * s, y - 3 * s, browCol);
+        drawLine(buf, cx + 2 * s, y - 3 * s, cx + 6 * s, y - 2 * s, browCol);
+        // קשתות עיניים צוחקות מעוגלות
         drawLine(buf, cx - 6 * s, y + 1 * s, cx - 4 * s, y - 1 * s, black);
         drawLine(buf, cx - 4 * s, y - 1 * s, cx - 2 * s, y + 1 * s, black);
         drawLine(buf, cx + 2 * s, y + 1 * s, cx + 4 * s, y - 1 * s, black);
         drawLine(buf, cx + 4 * s, y - 1 * s, cx + 6 * s, y + 1 * s, black);
-        // לחיים סמוקות וחיוך פתוח
-        drawRect(buf, cx - 7 * s, y + 2 * s, 2 * s, 2 * s, C16(255, 130, 150));
-        drawRect(buf, cx + 5 * s, y + 2 * s, 2 * s, 2 * s, C16(255, 130, 150));
-        drawRect(buf, cx - 3 * s, y + 4 * s, 6 * s, 2 * s, red);
-        drawRect(buf, cx - 4 * s, y + 3 * s, 1 * s, 2 * s, black);
-        drawRect(buf, cx + 3 * s, y + 3 * s, 1 * s, 2 * s, black);
+        // לחיים סמוקות ואף
+        drawRect(buf, cx - 7 * s, y + 2 * s, 2 * s, 2 * s, blush);
+        drawRect(buf, cx + 5 * s, y + 2 * s, 2 * s, 2 * s, blush);
+        drawRect(buf, cx, y + 2 * s, 1 * s, 1 * s, noseShd);
+        // חיוך רחב פתוח עם שיניים לבנות ולשון ורודה
+        drawRoundedPart(buf, cx - 4 * s, y + 3 * s, 8 * s, 5 * s, darkMouth, red, black);
+        drawRect(buf, cx - 3 * s, y + 4 * s, 6 * s, 1 * s, white);
+        drawRect(buf, cx - 2 * s, y + 6 * s, 4 * s, 1 * s, tongue);
         return;
     }
 
-    // EXPR_NORMAL: עיניים חיות עם לובן, אישון וניצוץ לבן + חיוך קטן
-    drawRect(buf, cx - 5 * s, y, 3 * s, 4 * s, white);
-    drawRect(buf, cx - 4 * s, y + 1 * s, 2 * s, 3 * s, pupilCol);
-    drawRect(buf, cx - 5 * s, y, 1 * s, 1 * s, white);
+    // 4. הבעה רגילה ריאליסטית וחיה (EXPR_NORMAL):
+    // כוללת מצמוץ עפעפיים טבעי כל כמה שניות, גבות, לובן עין, קשתית צבעונית, אישון, ניצוץ אור, אף וחיוך!
+    bool blinking = ((frameCnt % 110) >= 105);
 
-    drawRect(buf, cx + 2 * s, y, 3 * s, 4 * s, white);
-    drawRect(buf, cx + 3 * s, y + 1 * s, 2 * s, 3 * s, pupilCol);
-    drawRect(buf, cx + 2 * s, y, 1 * s, 1 * s, white);
+    // גבות טבעיות מעל העיניים
+    drawRect(buf, cx - 5 * s, y - 2 * s, 4 * s, 1 * s, browCol);
+    drawRect(buf, cx + 2 * s, y - 2 * s, 4 * s, 1 * s, browCol);
 
-    drawRect(buf, cx - 2 * s, y + 5 * s, 4 * s, 1 * s, C16(165, 70, 60));
+    if (blinking) {
+        // מצמוץ עפעפיים טבעי
+        drawRect(buf, cx - 5 * s, y + 1 * s, 4 * s, 1 * s, black);
+        drawRect(buf, cx + 2 * s, y + 1 * s, 4 * s, 1 * s, black);
+    } else {
+        // עין שמאל: קו ריסים עליון, לובן עין, קשתית צבעונית, אישון וניצוץ לבן
+        drawRect(buf, cx - 5 * s, y - 1 * s, 4 * s, 1 * s, black);
+        drawRect(buf, cx - 5 * s, y,         4 * s, 3 * s, sclera);
+        drawRect(buf, cx - 4 * s, y,         3 * s, 3 * s, irisCol);
+        drawRect(buf, cx - 3 * s, y + 1 * s, 2 * s, 2 * s, black);
+        drawRect(buf, cx - 4 * s, y,         1 * s, 1 * s, white);
+
+        // עין ימין: קו ריסים עליון, לובן עין, קשתית צבעונית, אישון וניצוץ לבן
+        drawRect(buf, cx + 2 * s, y - 1 * s, 4 * s, 1 * s, black);
+        drawRect(buf, cx + 2 * s, y,         4 * s, 3 * s, sclera);
+        drawRect(buf, cx + 3 * s, y,         3 * s, 3 * s, irisCol);
+        drawRect(buf, cx + 4 * s, y + 1 * s, 2 * s, 2 * s, black);
+        drawRect(buf, cx + 3 * s, y,         1 * s, 1 * s, white);
+    }
+
+    // גשר אף עדין וחיוך שפתיים טבעי עם זווית חיוך
+    drawRect(buf, cx, y + 2 * s, 1 * s, 2 * s, noseShd);
+    drawRect(buf, cx - 2 * s, y + 5 * s, 4 * s, 1 * s, C16(175, 70, 65));
+    drawRect(buf, cx - 3 * s, y + 4 * s, 1 * s, 1 * s, C16(175, 70, 65));
+    drawRect(buf, cx + 2 * s, y + 4 * s, 1 * s, 1 * s, C16(175, 70, 65));
 }
 
-// הפונקציה המלאה שמציירת כל דמות בצורה עגולה ומפורטת + 4 אנימציות ייחודיות + הבעות פנים!
+// הפונקציה המלאה שמציירת כל דמות בצורה עגולה ומפורטת + 4 אנימציות ייחודיות + הבעות פנים ריאליסטיות!
 void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, enum CharAnimState animState, enum FaceExpr faceExpr, int angle, int frameCnt) {
     if (charIdx < 0 || charIdx >= NUM_CHARS) charIdx = 0;
     const CharData* ch = &CHARACTERS[charIdx];
@@ -114,6 +170,9 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     u16 red     = C16(235, 35, 35);
     u16 silver  = C16(205, 215, 230);
 
+    // האם הדמות רצה כרגע או עומדת במקום (בעצירה / בתפריט הראשי השחקן עומד יציב ולא מזיז רגליים!)
+    bool isWalkingActive = (gameState == STATE_PLAYING || gameState == STATE_SHOP);
+
     // =========================================================================
     // חישוב 4 האנימציות הייחודיות לכל דמות לפי הסגנון והמאפיינים שלה!
     // =========================================================================
@@ -123,42 +182,37 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     int headTiltX = 0, headBobY = 0;
 
     if (animState == CHAR_ANIM_WALK) {
-        // 1. אנימציית הליכה/ריצה ייחודית לכל דמות!
-        int phase = (frameCnt / 3) % 4;
-        int stride = 4;
-        if (ch->style == STYLE_SPIN) {
-            // ריצת נינג'ה/סמוראי מהירה עם רכינה קדימה!
-            stride = 6;
-            headTiltX = 2;
-            armOffY = -2;
-        } else if (ch->style == STYLE_FLOAT) {
-            // ריחוף גלי עדין מעל הקרקע!
-            stride = 2;
-            bodyBobY = ((frameCnt / 5) % 2 == 0) ? -2 : 1;
-            armSpread = 2;
-        } else if (ch->style == STYLE_BOUNCE) {
-            // ניתורים קופצניים ושמחים!
-            stride = 5;
-            bodyBobY = (phase % 2 == 0) ? -3 : 1;
-        } else if (ch->style == STYLE_WOBBLE) {
-            // הליכה מתנדנדת מצחיקה מצד לצד (ליצן/בננה/פיראט)!
-            stride = 6;
-            headTiltX = (phase < 2) ? -2 : 2;
-            armOffY = (phase % 2 == 0) ? -3 : 2;
-        } else if (ch->style == STYLE_HEAVY) {
-            // צעידה כבדה ועוצמתית (אביר/קינג קונג/גודזילה)!
-            stride = 4;
-            bodyBobY = (phase == 1 || phase == 3) ? 2 : 0;
+        if (isWalkingActive) {
+            // 1. אנימציית הליכה/ריצה ייחודית לכל דמות!
+            int phase = (frameCnt / 3) % 4;
+            int stride = 4;
+            if (ch->style == STYLE_SPIN) {
+                stride = 6;
+                headTiltX = 2;
+                armOffY = -2;
+            } else if (ch->style == STYLE_FLOAT) {
+                stride = 2;
+                bodyBobY = ((frameCnt / 5) % 2 == 0) ? -2 : 1;
+                armSpread = 2;
+            } else if (ch->style == STYLE_BOUNCE) {
+                stride = 5;
+                bodyBobY = (phase % 2 == 0) ? -3 : 1;
+            } else if (ch->style == STYLE_WOBBLE) {
+                stride = 6;
+                headTiltX = (phase < 2) ? -2 : 2;
+                armOffY = (phase % 2 == 0) ? -3 : 2;
+            } else if (ch->style == STYLE_HEAVY) {
+                stride = 4;
+                bodyBobY = (phase == 1 || phase == 3) ? 2 : 0;
+            }
+
+            if (phase == 0)      { legOffL = -stride; legOffR =  stride; }
+            else if (phase == 2) { legOffL =  stride; legOffR = -stride; }
+            if (bodyBobY == 0) bodyBobY = (phase % 2 == 0) ? -1 : 1;
         }
-
-        if (phase == 0)      { legOffL = -stride; legOffR =  stride; }
-        else if (phase == 2) { legOffL =  stride; legOffR = -stride; }
-        if (bodyBobY == 0) bodyBobY = (phase % 2 == 0) ? -1 : 1;
-
     } else if (animState == CHAR_ANIM_JUMP) {
         // 2. אנימציית קפיצה ייחודית לכל דמות!
         if (ch->style == STYLE_SPIN) {
-            // סלטת אוויר מלאה (4 שלבי סיבוב) עם שובל תנועה!
             int spinDir = (frameCnt / 2) % 4;
             bodyBobY = (spinDir % 2 == 0) ? -3 : 2;
             bodyShiftX = (spinDir == 1) ? 2 : ((spinDir == 3) ? -2 : 0);
@@ -166,30 +220,25 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
             armOffY = -6;
             drawCircle(buf, cx - 4 * s, cy - 2 * s, 11 * s, ch->subColor);
         } else if (ch->style == STYLE_FLOAT) {
-            // ריחוף קסום באוויר עם טבעת אנרגיה מתחת לרגליים!
             bodyBobY = -3;
             armOffY = -4;
             armSpread = 3;
             legOffL = -2; legOffR = 2;
             drawRect(buf, cx - 8 * s, cy + 14 * s, 16 * s, 2 * s, C16(120, 240, 255));
         } else if (ch->style == STYLE_BOUNCE) {
-            // מתיחה אנכית קפיצית באוויר!
             bodyBobY = -4;
             headBobY = -2;
             legOffL = 3; legOffR = -3;
             armOffY = -5;
         } else if (ch->style == STYLE_FLAP) {
-            // תעופת כנפיים עוצמתית באוויר!
             bodyBobY = -3;
             armOffY = ((frameCnt / 2) % 2 == 0) ? -6 : 2;
             legOffL = -3; legOffR = -3;
         } else if (ch->style == STYLE_HEAVY) {
-            // קפיצת ריסוק כבדה עם ידיים מונפות!
             armOffY = -7;
             armSpread = 2;
             legOffL = -4; legOffR = 4;
         } else {
-            // קפיצת פלטפורמה קלאסית דינמית!
             bodyBobY = -2;
             armOffY = -5;
             legOffL = -4; legOffR = 3;
@@ -200,7 +249,7 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         bodyShiftX = -3 + ((frameCnt % 2) * 3);
         bodyBobY = -1;
         headTiltX = -3;
-        legOffL = 6;  // רגליים נזרקות קדימה מעוצמת המכה באבן
+        legOffL = 6;
         legOffR = -5;
         armOffY = -6;
         armSpread = 4;
@@ -209,9 +258,9 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     } else if (animState == CHAR_ANIM_HIT_AIR) {
         // 4. אנימציית פגיעה מאויב מעופף: התכווצות והדפה כלפי מטה + ניצוצות פגיעה מלמעלה!
         bodyShiftX = ((frameCnt % 2) == 0) ? -2 : 2;
-        bodyBobY = 4;     // הדמות נמעכת כלפי מטה מהמכה האווירית
-        headBobY = 3;     // הראש מתכווץ לכתפיים
-        armOffY = -7;     // ידיים מגינות על הראש
+        bodyBobY = 4;
+        headBobY = 3;
+        armOffY = -7;
         legOffL = -5; legOffR = 5;
         faceExpr = EXPR_HURT;
     }
@@ -221,14 +270,14 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
 
     // 1. גלימות או כנפיים מעוגלות מאחורי הגוף
     if (charIdx == 3 || charIdx == 44 || charIdx == 21 || charIdx == 90 || charIdx == 45) {
-        u16 capeCol = (charIdx == 45) ? C16(30, 35, 50) : red; // גלימה כהה לאיש העטלף, אדומה למלך/סופרמן/דרקולה
-        int capeWave = ((frameCnt / 4) % 2) * 2;
+        u16 capeCol = (charIdx == 45) ? C16(30, 35, 50) : red;
+        int capeWave = isWalkingActive ? (((frameCnt / 4) % 2) * 2) : 0;
         drawRoundedPart(buf, x - (11 + capeWave) * s, y - 5 * s, 22 * s, 16 * s, capeCol, white, black);
         if (charIdx == 3) {
             drawRoundedPart(buf, x - 10 * s, y - 6 * s, 20 * s, 4 * s, white, white, black);
         }
     } else if (ch->shape == SHAPE_WINGED) {
-        int flap = (animState == CHAR_ANIM_JUMP || animState == CHAR_ANIM_WALK) ? (((frameCnt / 3) % 2) * 6 - 3) : 0;
+        int flap = (isWalkingActive && (animState == CHAR_ANIM_JUMP || animState == CHAR_ANIM_WALK)) ? (((frameCnt / 3) % 2) * 6 - 3) : 0;
         drawRoundedPart(buf, x - 16 * s, y - (6 + flap) * s, 9 * s, 11 * s, ch->subColor, white, black);
         drawRoundedPart(buf, x + 7 * s,  y - (6 + flap) * s, 9 * s, 11 * s, ch->subColor, white, black);
     }
@@ -241,16 +290,13 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
 
     // 3. דמויות האוכל המעוגלות והמפורטות:
     if (ch->shape == SHAPE_BURGER) {
-        // המבורגר עגול ועסיסי (לא מלבני!)
         drawRoundedPart(buf, x - 11 * s, y + 3 * s, 22 * s, 5 * s, C16(225, 150, 60), C16(250, 190, 100), black);
         drawRoundedPart(buf, x - 12 * s, y - 2 * s, 24 * s, 6 * s, C16(105, 55, 25), C16(150, 85, 45), black);
         drawRect(buf, x - 10 * s, y - 3 * s, 20 * s, 2 * s, gold);
         drawRoundedPart(buf, x - 13 * s, y - 5 * s, 26 * s, 4 * s, C16(46, 210, 90), C16(110, 245, 140), black);
-        // כיפת לחמנייה עגולה אמיתית!
         drawCircle(buf, x, y - 7 * s, 11 * s, black);
         drawCircle(buf, x, y - 7 * s, 10 * s, C16(235, 165, 70));
         drawCircle(buf, x - 3 * s, y - 10 * s, 6 * s, C16(250, 195, 110));
-        // שומשום
         drawRect(buf, x - 5 * s, y - 14 * s, 2 * s, 1 * s, white);
         drawRect(buf, x + 1 * s, y - 15 * s, 2 * s, 1 * s, white);
         drawRect(buf, x + 5 * s, y - 13 * s, 2 * s, 1 * s, white);
@@ -259,7 +305,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
     if (ch->shape == SHAPE_PIZZA) {
-        // משולש פיצה מעוגל בקרום עם גבינה מותכת ופפרוני
         drawRoundedPart(buf, x - 12 * s, y - 16 * s, 24 * s, 6 * s, C16(215, 135, 50), C16(245, 175, 90), black);
         for (int r = 0; r < 20 * s; r++) {
             int hw = (20 * s - r) / 2;
@@ -273,7 +318,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
     if (ch->shape == SHAPE_SUSHI) {
-        // רול סושי מעוגל עם אורז, אצה וסלמון
         drawRoundedPart(buf, x - 10 * s, y - 7 * s, 20 * s, 14 * s, white, white, black);
         drawRoundedPart(buf, x - 11 * s, y - 13 * s, 22 * s, 7 * s, C16(255, 110, 60), C16(255, 175, 140), black);
         drawRoundedPart(buf, x - 4 * s, y - 13 * s, 8 * s, 20 * s, C16(20, 45, 25), C16(45, 80, 50), black);
@@ -293,7 +337,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
     if (ch->shape == SHAPE_BANANA) {
-        // בננה מעוגלת, קמורה ולא מרובעת! עם קליפות פתוחות בצדדים!
         drawRoundedPart(buf, x - 11 * s, y - 4 * s, 6 * s, 9 * s, C16(240, 210, 30), C16(255, 245, 120), black);
         drawRoundedPart(buf, x + 5 * s,  y - 4 * s, 6 * s, 9 * s, C16(240, 210, 30), C16(255, 245, 120), black);
         drawCircle(buf, x, y - 10 * s, 7 * s, black);
@@ -304,7 +347,7 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         goto draw_hit_fx;
     }
 
-    // 4. דמויות מיינקראפט (סטיב, קריפר, זומבי, אנדרמן) - נשארות קובייתיות בכוונה לפי המקור!
+    // 4. דמויות מיינקראפט (סטיב, קריפר, זומבי, אנדרמן):
     if (ch->shape == SHAPE_MINECRAFT) {
         drawBoxOut(buf, x - 7 * s, y - 4 * s, 14 * s, 11 * s, ch->mainColor, black);
         u16 headCol = (charIdx == 17) ? skin : ch->mainColor;
@@ -330,7 +373,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
 
     // 5. חיות פרוותיות ומעוגלות (חתול, כלב, פנדה, שועל, אריה, נמר, ארנב, חד קרן):
     if (ch->shape == SHAPE_ANIMAL_EARS) {
-        // זנב עגול וגוף אליפטי מעוגל
         drawCircle(buf, x - 10 * s, y + 2 * s, 4 * s, black);
         drawCircle(buf, x - 10 * s, y + 2 * s, 3 * s, ch->subColor);
         drawRoundedPart(buf, x - 7 * s, y - 4 * s, 14 * s, 11 * s, ch->mainColor, white, black);
@@ -344,18 +386,16 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
             drawCircle(buf, hx, hy, 10 * s, C16(175, 85, 20));
         }
 
-        // אוזניים מעוגלות
         int earH = (charIdx == 53) ? 9 * s : 5 * s;
         drawRoundedPart(buf, hx - 7 * s, hy - 6 * s - earH, 5 * s, earH + 3 * s, ch->mainColor, white, black);
         drawRoundedPart(buf, hx + 2 * s, hy - 6 * s - earH, 5 * s, earH + 3 * s, ch->mainColor, white, black);
         drawRect(buf, hx - 5 * s, hy - 4 * s - earH, 2 * s, earH - 1 * s, C16(255, 165, 195));
         drawRect(buf, hx + 3 * s, hy - 4 * s - earH, 2 * s, earH - 1 * s, C16(255, 165, 195));
 
-        // ראש עגול שלם!
         drawCircle(buf, hx, hy, 8 * s, black);
         drawCircle(buf, hx, hy, 7 * s, ch->mainColor);
 
-        if (charIdx == 60) { // קרן חד-קרן מוזהבת
+        if (charIdx == 60) {
             drawRoundedPart(buf, hx - 2 * s, hy - 14 * s, 4 * s, 8 * s, gold, white, black);
         }
 
@@ -364,53 +404,46 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         goto draw_hit_fx;
     }
 
-    // 6. כל הדמויות האנושיות, הגיבורים והלוחמים - בעיצוב אנטומי עגול, מפורט ולא מרובע!
-    // פלג גוף עליון מעוגל עם חגורה
+    // 6. כל הדמויות האנושיות, הגיבורים והלוחמים:
     drawRoundedPart(buf, x - 7 * s, y - 4 * s, 14 * s, 11 * s, ch->mainColor, white, black);
     drawRect(buf, x - 6 * s, y + 3 * s, 12 * s, 2 * s, C16(50, 35, 25));
     drawRect(buf, x - 2 * s, y + 3 * s, 4 * s, 2 * s, gold);
 
-    // סמלי חזה מיוחדים לגיבורי על (סופר-איש = 44, איש העטלף = 45, איש העכביש = 46, האקר = 42):
-    if (charIdx == 44) { // סמל יהלום אדום-צהוב לסופר-איש
+    if (charIdx == 44) {
         drawCircle(buf, x, y - 1 * s, 3 * s, gold);
         drawRect(buf, x - 2 * s, y - 1 * s, 4 * s, 2 * s, red);
-    } else if (charIdx == 45) { // סמל העטלף הצהוב על החזה של איש העטלף
+    } else if (charIdx == 45) {
         drawRect(buf, x - 4 * s, y - 2 * s, 8 * s, 3 * s, gold);
         drawRect(buf, x - 3 * s, y - 1 * s, 6 * s, 1 * s, black);
-    } else if (charIdx == 46) { // רשת וסמל עכביש לאיש העכביש
+    } else if (charIdx == 46) {
         drawRect(buf, x - 1 * s, y - 2 * s, 2 * s, 4 * s, black);
         drawLine(buf, x - 4 * s, y - 2 * s, x + 4 * s, y + 1 * s, black);
         drawLine(buf, x - 4 * s, y + 1 * s, x + 4 * s, y - 2 * s, black);
-    } else if (charIdx == 42) { // סמל בינארי זוהר להאקר
+    } else if (charIdx == 42) {
         drawRect(buf, x - 3 * s, y - 2 * s, 6 * s, 3 * s, C16(118, 255, 3));
     }
 
-    // כתפיים וזרועות מעוגלות עם כפפות עגולות (משתנות לפי האנימציה!)
     drawRoundedPart(buf, x - (11 + armSpread) * s, y - (3 - armOffY / 2) * s, 5 * s, 8 * s, ch->mainColor, white, black);
     drawRoundedPart(buf, x + (6 + armSpread) * s,  y - (3 - armOffY / 2) * s, 5 * s, 8 * s, ch->mainColor, white, black);
     drawCircle(buf, x - (9 + armSpread) * s, y + (4 + armOffY / 2) * s, 2 * s, skin);
     drawCircle(buf, x + (8 + armSpread) * s, y + (4 + armOffY / 2) * s, 2 * s, skin);
 
-    // צוואר וראש אנושי עגול וטבעי (במקום ריבוע!)
     int hx = x + headTiltX * s;
     int hy = y - 10 * s + headBobY * s;
     drawRect(buf, hx - 2 * s, y - 5 * s, 4 * s, 3 * s, skin);
 
     u16 faceCol = (ch->shape == SHAPE_MONSTER) ? ch->mainColor : skin;
-    if (charIdx == 46) faceCol = red;              // מסכת ספיידרמן אדומה עגולה
-    if (charIdx == 1)  faceCol = C16(30, 32, 45);  // מסכת נינג'ה עגולה
-    if (charIdx == 4)  faceCol = C16(135, 235, 255); // ראש קרח גבישי עגול
+    if (charIdx == 46) faceCol = red;
+    if (charIdx == 1)  faceCol = C16(30, 32, 45);
+    if (charIdx == 4)  faceCol = C16(135, 235, 255);
 
-    // ציור גולגולת וראש עגולים לחלוטין עם אור וצל!
     drawCircle(buf, hx, hy, 8 * s, black);
     drawCircle(buf, hx, hy, 7 * s, faceCol);
     if (faceCol == skin) {
         drawCircle(buf, hx - 2 * s, hy - 2 * s, 3 * s, skinLit);
     }
 
-    // אפקטים מיוחדים לראש לפי הדמות:
     if (charIdx == 1) {
-        // נינג'ה: חרב קטאנה באלכסון, פתח עיניים מעוגל וסרט מצח מתנופף
         drawLine(buf, x - 8 * s, y - 4 * s, x + 9 * s, y - 19 * s, silver);
         drawRoundedPart(buf, hx - 6 * s, hy - 3 * s, 12 * s, 5 * s, skin, skinLit, black);
         drawRoundedPart(buf, hx - 8 * s, hy - 6 * s, 16 * s, 4 * s, red, C16(255, 110, 110), black);
@@ -419,7 +452,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
     if (charIdx == 2) {
-        // חייזר: ראש חייזרי עגול ורחב עם אנטנות זוהרות ועיניים חיות!
         drawCircle(buf, hx, hy - 1 * s, 9 * s, black);
         drawCircle(buf, hx, hy - 1 * s, 8 * s, C16(46, 215, 110));
         drawLine(buf, hx - 4 * s, hy - 8 * s, hx - 7 * s, hy - 13 * s, C16(46, 215, 110));
@@ -431,7 +463,6 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
     if (charIdx == 45) {
-        // איש העטלף: מסכת עטלף מעוגלת עם אוזניים מחודדות ועיניים לבנות!
         drawCircle(buf, hx, hy - 1 * s, 8 * s, black);
         drawCircle(buf, hx, hy - 1 * s, 7 * s, C16(35, 40, 55));
         drawRoundedPart(buf, hx - 7 * s, hy - 12 * s, 4 * s, 7 * s, C16(35, 40, 55), silver, black);
@@ -442,13 +473,11 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
     if (charIdx == 46) {
-        // איש העכביש: עיני מסכה לבנות אלכסוניות + הבעה משתנה!
         drawDynamicFace(buf, hx, hy - 2 * s, s, white, faceExpr, frameCnt);
         goto draw_hit_fx;
     }
 
     if (charIdx == 42 || charIdx == 35) {
-        // האקר / מטריקס: קפוצ'ון (Hoodie) כהה מעוגל ומשקפי סייבר ירוקים זוהרים!
         drawCircle(buf, hx, hy - 1 * s, 9 * s, black);
         drawCircle(buf, hx, hy - 1 * s, 8 * s, C16(25, 35, 30));
         drawCircle(buf, hx, hy, 6 * s, skin);
@@ -459,51 +488,42 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
         goto draw_hit_fx;
     }
 
-    // ציור הפנים הדינמיות לכל שאר הדמויות
+    // ציור הפנים הריאליסטיות לכל שאר הדמויות
     drawDynamicFace(buf, hx, hy - 2 * s, s, black, faceExpr, frameCnt);
 
-    // זקן עגול ומטה קסמים לקוסם (5)
     if (charIdx == 5 || charIdx == 82 || charIdx == 83) {
         drawCircle(buf, hx, hy + 5 * s, 5 * s, white);
         drawLine(buf, x + 11 * s, y + 12 * s, x + 11 * s, y - 12 * s, C16(130, 80, 35));
         drawCircle(buf, x + 11 * s, y - 14 * s, 4 * s, C16(0, 245, 255));
     }
 
-    // שרביט מלכות מוזהב למלך (3)
     if (charIdx == 3) {
         drawLine(buf, x + 11 * s, y + 10 * s, x + 11 * s, y - 10 * s, gold);
         drawCircle(buf, x + 11 * s, y - 12 * s, 3 * s, red);
     }
 
-    // כובעים, כתרים, קסדות אבירים ומצנפות מעוגלות:
     if (ch->specialAcc == 1) {
-        // כתר מלכותי מעוגל ומשובץ אבני חן
         drawRoundedPart(buf, hx - 8 * s, hy - 10 * s, 16 * s, 5 * s, gold, white, black);
         drawCircle(buf, hx - 5 * s, hy - 11 * s, 2 * s, gold);
         drawCircle(buf, hx,         hy - 12 * s, 2 * s, gold);
         drawCircle(buf, hx + 5 * s, hy - 11 * s, 2 * s, gold);
         drawRect(buf, hx, hy - 9 * s, 2 * s, 2 * s, red);
     } else if (ch->specialAcc == 2) {
-        // מצנפת קוסם / כובע ליצן עגול עם פונפונים!
         drawRoundedPart(buf, hx - 11 * s, hy - 8 * s, 22 * s, 4 * s, ch->subColor, white, black);
         drawCircle(buf, hx, hy - 11 * s, 6 * s, ch->mainColor);
         drawCircle(buf, hx, hy - 15 * s, 4 * s, ch->mainColor);
         drawCircle(buf, hx, hy - 18 * s, 2 * s, gold);
     } else if (ch->specialAcc == 3) {
-        // קסדה עגולה עם קרניים מעוקלות
         drawRoundedPart(buf, hx - 8 * s, hy - 10 * s, 16 * s, 5 * s, ch->subColor, white, black);
         drawCircle(buf, hx - 9 * s, hy - 11 * s, 3 * s, white);
         drawCircle(buf, hx + 9 * s, hy - 11 * s, 3 * s, white);
     } else if (ch->specialAcc == 4) {
-        // הילת מלאך מעוגלת וזוהרת
         drawRoundedPart(buf, hx - 7 * s, hy - 13 * s, 14 * s, 4 * s, gold, white, black);
     } else if (ch->specialAcc == 5) {
-        // קסדת אביר עגולה עם נוצה מתנופפת
         drawCircle(buf, hx, hy - 4 * s, 8 * s, silver);
         drawRoundedPart(buf, hx - 2 * s, hy - 14 * s, 5 * s, 6 * s, red, white, black);
     } else {
-        // כובע/תספורת עגולה ומעוצבת (ללא פינות מרובעות!)
-        if (charIdx == 44) { // תספורת סופרמן כהה עם תלתל במצח
+        if (charIdx == 44) {
             drawRoundedPart(buf, hx - 8 * s, hy - 9 * s, 16 * s, 5 * s, C16(25, 30, 45), C16(60, 70, 100), black);
             drawCircle(buf, hx + 1 * s, hy - 5 * s, 2 * s, C16(25, 30, 45));
         } else {
@@ -513,24 +533,18 @@ void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, 
     }
 
 draw_hit_fx:
-    // =========================================================================
-    // אפקטים ויזואליים ייחודיים ל-2 אנימציות הפגיעה (קרקע לעומת מעופף)!
-    // =========================================================================
     if (animState == CHAR_ANIM_HIT_GROUND) {
-        // כוכבי סחרחורת זהובים שמסתובבים מעל הראש בהיתקלות באבן/אויב קרקע!
         int starSpin = (frameCnt / 3) % 3;
         drawCircle(buf, x - 8 * s + starSpin * 3 * s, y - 21 * s, 2 * s, gold);
         drawCircle(buf, x + 8 * s - starSpin * 3 * s, y - 21 * s, 2 * s, C16(255, 100, 0));
         drawCircle(buf, x,                            y - 23 * s, 2 * s, white);
     } else if (animState == CHAR_ANIM_HIT_AIR) {
-        // גלי הדף וניצוצות ברק אדומים-צהובים בפגיעה מאויב מעופף!
         drawLine(buf, x - 12 * s, y - 18 * s, x - 5 * s, y - 11 * s, gold);
         drawLine(buf, x + 12 * s, y - 18 * s, x + 5 * s, y - 11 * s, red);
         drawCircle(buf, x, y - 16 * s, 3 * s, gold);
     }
 }
 
-// שמירה על תאימות מלאה לכל הקריאות הקיימות בקוד
 void drawCharacterSprite(u16* buf, int charIdx, int cx, int cy, int scalePct, bool isMoving, bool grounded, int angle, int frameCnt) {
     enum CharAnimState st = grounded ? CHAR_ANIM_WALK : CHAR_ANIM_JUMP;
     drawCharacterSpriteEx(buf, charIdx, cx, cy, scalePct, st, currentFaceExpr, angle, frameCnt);
