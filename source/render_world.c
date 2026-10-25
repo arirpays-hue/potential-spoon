@@ -101,12 +101,12 @@ static void drawDetailedCloud(u16* buf, int x, int y) {
     drawRect(buf, x - 12, y + 5, 24, 5, shadow);
 }
 
-// ציור שכבת הרים וגבעות רחוקות באופק (Parallax Background)
-static void drawDistantHills(u16* buf, const BiomeData* b, int scrollOffset) {
-    int r = (b->skyBot[0] + b->ground[0]) / 2;
-    int g = (b->skyBot[1] + b->ground[1]) / 2;
-    int bl = (b->skyBot[2] + b->ground[2]) / 2;
-    u16 hillCol = rgb8To16_fixed(r - 20, g - 20, bl - 20);
+// ציור שכבת הרים וגבעות רחוקות באופק עם צבעים שעוברים בהדרגתיות!
+static void drawDistantHills(u16* buf, int scrollOffset) {
+    int r  = ((int)smoothSkyBot[0] + (int)smoothGround[0]) / 2;
+    int g  = ((int)smoothSkyBot[1] + (int)smoothGround[1]) / 2;
+    int bl = ((int)smoothSkyBot[2] + (int)smoothGround[2]) / 2;
+    u16 hillCol   = rgb8To16_fixed(r - 20, g - 20, bl - 20);
     u16 hillLight = rgb8To16_fixed(r + 10, g + 10, bl + 10);
 
     for (int x = 0; x < SCREEN_W; x++) {
@@ -136,20 +136,16 @@ static void drawSceneryElement(u16* buf, BgElement* el) {
 
     switch (el->type) {
         case SCN_CANDY: { // רקע סוכריות ענקיות, וופלים ומקלות סבא בביומת הממתקים!
-            // מקל סוכרייה עם פסים
             drawFramedRect(buf, x + 13, gy - 52, 6, 52, C16(255, 255, 255), C16(180, 180, 200));
             for (int py = gy - 48; py < gy - 4; py += 8) {
                 drawRect(buf, x + 14, py, 4, 3, C16(255, 80, 160));
             }
-            // פפיון לעטיפת הסוכרייה
             drawFramedRect(buf, x + 8, gy - 36, 16, 5, C16(0, 220, 255), black);
-            // סוכריית ספירלה ענקית רב-שכבתית
             drawShadedCircle(buf, x + 16, gy - 54, 17, C16(255, 30, 140), C16(255, 130, 200), C16(190, 10, 90), black);
             drawCircle(buf, x + 16, gy - 54, 13, C16(255, 250, 255));
             drawCircle(buf, x + 16, gy - 54, 9,  C16(0, 230, 255));
             drawCircle(buf, x + 16, gy - 54, 6,  C16(255, 230, 0));
             drawCircle(buf, x + 16, gy - 54, 3,  C16(255, 30, 140));
-            // ברק לבן על הסוכרייה
             drawCircle(buf, x + 9, gy - 61, 2, C16(255, 255, 255));
             break;
         }
@@ -157,12 +153,9 @@ static void drawSceneryElement(u16* buf, BgElement* el) {
             for (int r = 0; r < 52; r++) {
                 int y = gy - 1 - r;
                 int halfW = 52 - r;
-                // צד שמאל מואר מהשמש
                 drawRect(buf, x + 52 - halfW, y, halfW, 1, (r % 6 == 0) ? C16(190, 135, 50) : C16(245, 195, 85));
-                // צד ימין מוצל
                 drawRect(buf, x + 52, y, halfW, 1, (r % 6 == 0) ? C16(140, 95, 30) : C16(185, 130, 50));
             }
-            // פתח מסתורי בפירמידה
             drawFramedRect(buf, x + 46, gy - 14, 12, 14, C16(25, 15, 10), C16(120, 80, 25));
             break;
         }
@@ -174,10 +167,8 @@ static void drawSceneryElement(u16* buf, BgElement* el) {
                 drawRect(buf, sx + 1, sy + 1, 3, 6, C16(185, 125, 65));
             }
             int topX = x + 19, topY = gy - 54;
-            // אגוזי קוקוס
             drawShadedCircle(buf, topX - 3, topY + 3, 4, C16(90, 55, 25), C16(130, 80, 40), C16(50, 30, 10), black);
             drawShadedCircle(buf, topX + 4, topY + 3, 4, C16(90, 55, 25), C16(130, 80, 40), C16(50, 30, 10), black);
-            // כפות דקל
             drawShadedCircle(buf, topX - 14, topY - 2, 9, C16(35, 175, 55), C16(90, 225, 95), C16(20, 120, 35), black);
             drawShadedCircle(buf, topX + 14, topY - 2, 9, C16(35, 175, 55), C16(90, 225, 95), C16(20, 120, 35), black);
             drawShadedCircle(buf, topX,      topY - 8, 11, C16(45, 195, 65), C16(110, 240, 110), C16(25, 140, 40), black);
@@ -190,10 +181,8 @@ static void drawSceneryElement(u16* buf, BgElement* el) {
                 int startX = x + r / 2;
                 u16 rockCol = (r > 38) ? C16(255, 80, 0) : ((r % 5 == 0) ? C16(45, 25, 25) : C16(65, 40, 40));
                 drawRect(buf, startX, y, w, 1, rockCol);
-                // זרם לבה שיורד במורד ההר
                 drawRect(buf, x + 36 + (r % 3), y, 5, 1, (r % 2 == 0) ? C16(255, 200, 0) : C16(255, 60, 0));
             }
-            // פיצוץ לבה בראש ההר
             drawCircle(buf, x + 38, gy - 52, 8, C16(255, 120, 0));
             drawCircle(buf, x + 38, gy - 52, 4, C16(255, 240, 80));
             break;
@@ -228,26 +217,22 @@ static void drawSceneryElement(u16* buf, BgElement* el) {
         }
         case SCN_SAKURA:
         case SCN_ORANGE_TREE:
-        default: { // עץ מפורט ברזולוציה גבוהה: שורשים, גזע מוצלל עם טקסטורת קליפה, 4 כדורי עלווה ופירות!
+        default: { // עץ מפורט ברזולוציה גבוהה
             u16 leafBase  = (el->type == SCN_SAKURA) ? C16(255, 145, 195) : ((el->type == SCN_ORANGE_TREE) ? C16(235, 115, 25) : C16(38, 165, 52));
             u16 leafLight = (el->type == SCN_SAKURA) ? C16(255, 205, 230) : ((el->type == SCN_ORANGE_TREE) ? C16(255, 175, 55) : C16(95, 220, 90));
             u16 leafDark  = (el->type == SCN_SAKURA) ? C16(195, 85, 135)  : ((el->type == SCN_ORANGE_TREE) ? C16(165, 65, 10)  : C16(22, 105, 32));
 
-            // שורשים רחבים בתחתית הגזע
             drawFramedRect(buf, x + 9, gy - 6, 22, 6, C16(105, 65, 35), black);
-            // גזע העץ עם אור וצל וקליפה
             drawFramedRect(buf, x + 13, gy - 44, 14, 42, C16(120, 75, 42), black);
-            drawRect(buf, x + 14, gy - 43, 4, 40, C16(155, 102, 60)); // צד מואר בגזע
-            drawRect(buf, x + 22, gy - 43, 4, 40, C16(82, 48, 25));   // צד מוצל בגזע
-            drawRect(buf, x + 18, gy - 30, 2, 8, C16(65, 38, 18));    // חריץ בעץ
+            drawRect(buf, x + 14, gy - 43, 4, 40, C16(155, 102, 60));
+            drawRect(buf, x + 22, gy - 43, 4, 40, C16(82, 48, 25));
+            drawRect(buf, x + 18, gy - 30, 2, 8, C16(65, 38, 18));
 
-            // 4 אשכולות עלווה עשירים עם נפח וקווי מתאר
             drawShadedCircle(buf, x + 9,  gy - 44, 13, leafBase, leafLight, leafDark, black);
             drawShadedCircle(buf, x + 31, gy - 44, 13, leafBase, leafLight, leafDark, black);
             drawShadedCircle(buf, x + 20, gy - 40, 14, leafBase, leafLight, leafDark, black);
             drawShadedCircle(buf, x + 20, gy - 55, 15, leafBase, leafLight, leafDark, black);
 
-            // תפוחים אדומים / פירות יער מנצנצים על העץ!
             drawCircle(buf, x + 12, gy - 48, 2, C16(240, 35, 35));
             drawCircle(buf, x + 27, gy - 43, 2, C16(240, 35, 35));
             drawCircle(buf, x + 19, gy - 58, 2, C16(240, 35, 35));
@@ -256,22 +241,38 @@ static void drawSceneryElement(u16* buf, BgElement* el) {
     }
 }
 
-// ציור אויבים ברזולוציה גבוהה עם פרטים, עיניים, שיניים ואנימציה!
+// בדיקה אם האויב מוגדר כ"יצור חי" לצורך הפעלת אנימציית תקיפה כשהוא פוגע בשחקן!
+static bool isLivingEnemy(enum ObsType t) {
+    if (t >= OBS_BIRD_START) return true;
+    return (t == OBS_SNAKE || t == OBS_PENGUIN || t == OBS_RED_SHROOM ||
+            t == OBS_PUMPKIN || t == OBS_MAGMA || t == OBS_LOLLIPOP);
+}
+
+// ציור אויבים ברזולוציה גבוהה + אנימציית תקיפה לאויבים חיים שפגעו בשחקן!
 static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCnt) {
-    int x = (int)o->x;
-    int y = (int)o->y;
+    bool attacking = (o->hitAnimTimer > 0 && isLivingEnemy(o->type));
+    int atkLungeX = attacking ? -4 + ((o->hitAnimTimer / 2) % 2) * 3 : 0;
+    int atkHopY   = attacking ? -(((o->hitAnimTimer / 3) % 2) * 4) : 0;
+
+    int x = (int)o->x + atkLungeX;
+    int y = (int)o->y + atkHopY;
     u16 black  = C16(18, 18, 22);
     u16 white  = C16(252, 252, 255);
     u16 red    = C16(245, 35, 35);
     u16 yellow = C16(255, 225, 25);
 
+    // הילת תקיפה אדומה-כתומה לאויב חי בזמן פגיעה בשחקן!
+    if (attacking) {
+        drawCircle(buf, x + 8, y + 10, 12, yellow);
+        drawCircle(buf, x + 8, y + 10, 9,  red);
+    }
+
     // 1. אויבים מעופפים ברזולוציה גבוהה!
     if (o->type >= OBS_BIRD_START) {
-        int flap = ((frameCnt / 4) % 2 == 0) ? -7 : 5;
+        int flap = attacking ? (((o->hitAnimTimer) % 2 == 0) ? -10 : 8) : (((frameCnt / 4) % 2 == 0) ? -7 : 5);
 
         if (o->type == OBS_GHOST || o->type == OBS_GHAST) {
-            // רוח רפאים מפורטת עם זנב גלי ועיניים בורקות
-            drawShadedCircle(buf, x + 12, y + 8, 9, white, white, C16(190, 210, 235), black);
+            drawShadedCircle(buf, x + 12, y + 8, attacking ? 11 : 9, white, white, C16(190, 210, 235), black);
             drawRect(buf, x + 3, y + 8, 18, 8, white);
             drawCircle(buf, x + 6,  y + 16, 3, white);
             drawCircle(buf, x + 12, y + 16, 3, white);
@@ -280,23 +281,26 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
             drawCircle(buf, x + 14, y + 8, 2, black);
             drawCircle(buf, x + 7,  y + 8, 1, red);
             drawCircle(buf, x + 13, y + 8, 1, red);
+            if (attacking) { // פה פעור לרוח הרפאים בתקיפה!
+                drawCircle(buf, x + 10, y + 13, 3, black);
+            }
             return;
         }
 
         if (o->type == OBS_DRONE || o->type == OBS_ALIEN_BIRD || o->type == OBS_MECH_BIRD) {
-            // רחפן קרב עתידני / חללית חייזרית עם מדחפים מסתובבים ועין לייזר!
             drawFramedRect(buf, x + 4, y + 6, 16, 8, C16(90, 105, 120), black);
             drawShadedCircle(buf, x + 12, y + 10, 6, C16(140, 155, 175), white, C16(75, 85, 100), black);
-            drawCircle(buf, x + 9, y + 10, 3, red);
+            drawCircle(buf, x + 9, y + 10, attacking ? 4 : 3, red);
             drawCircle(buf, x + 8, y + 9, 1, yellow);
-            // להבי רחפן מסתובבים למעלה
             int bladeW = ((frameCnt / 2) % 2 == 0) ? 22 : 10;
             drawRect(buf, x + 12 - bladeW / 2, y + 1, bladeW, 2, C16(0, 240, 255));
             drawRect(buf, x + 11, y + 3, 2, 3, black);
+            if (attacking) { // קרן לייזר בתקיפה!
+                drawLine(buf, x + 6, y + 10, x - 8, y + 14, red);
+            }
             return;
         }
 
-        // ציפור קרב / נשר / תוכי / ציפור אש / עטלף עם מקור, נוצות זנב וכנף מונפשת!
         u16 bodyBase  = C16(75, 65, 90);
         u16 bodyLight = C16(120, 110, 140);
         u16 wingCol   = C16(95, 85, 115);
@@ -304,93 +308,83 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
         if (o->type == OBS_FIRE_BIRD) { bodyBase = C16(255, 110, 0); bodyLight = C16(255, 220, 40); wingCol = C16(230, 35, 0); }
         if (o->type == OBS_CROW || o->type == OBS_BAT) { bodyBase = C16(40, 35, 50); bodyLight = C16(80, 75, 95); wingCol = C16(60, 40, 80); }
 
-        // זנב מדורג
         drawFramedRect(buf, x + 18, y + 7, 7, 5, wingCol, black);
-        // גוף הציפור וראש
         drawShadedCircle(buf, x + 13, y + 10, 6, bodyBase, bodyLight, bodyBase, black);
         drawShadedCircle(buf, x + 7,  y + 8,  5, bodyBase, bodyLight, bodyBase, black);
-        // מקור חד וצהוב הפונה שמאלה (לכיוון השחקן)
-        drawFramedRect(buf, x, y + 7, 5, 4, yellow, black);
-        // עין כועסת
-        drawRect(buf, x + 5, y + 6, 2, 2, white);
-        drawRect(buf, x + 5, y + 7, 1, 1, black);
-        // כנף מתנפנפת
+        // מקור פעור בתקיפה או סגור בתעופה רגילה!
+        if (attacking) {
+            drawLine(buf, x + 3, y + 6, x - 3, y + 4, yellow);
+            drawLine(buf, x + 3, y + 9, x - 3, y + 11, yellow);
+        } else {
+            drawFramedRect(buf, x, y + 7, 5, 4, yellow, black);
+        }
+        drawRect(buf, x + 5, y + 6, 2, 2, attacking ? red : white);
         drawShadedCircle(buf, x + 13, y + 9 + flap / 2, 5, wingCol, bodyLight, bodyBase, black);
         return;
     }
 
     // 2. אויבים קרקעיים ברזולוציה גבוהה לפי כל ביומה!
     switch (o->type) {
-        case OBS_CACTUS: { // קקטוס מדברי מפורט עם צלעות אורך, קוצים לבנים ופרח אדום בראשו!
+        case OBS_CACTUS: {
             u16 cDark = C16(22, 115, 45), cMid = C16(42, 168, 68), cLight = C16(95, 220, 105);
-            // גזע מרכזי
             drawFramedRect(buf, x + 7, y, 10, 26, cMid, black);
             drawRect(buf, x + 9, y + 2, 2, 22, cLight);
             drawRect(buf, x + 13, y + 2, 2, 22, cDark);
-            // זרוע שמאלית וימנית
             drawFramedRect(buf, x + 1, y + 8, 7, 5, cMid, black);
             drawFramedRect(buf, x + 1, y + 3, 5, 8, cMid, black);
             drawFramedRect(buf, x + 16, y + 11, 7, 5, cMid, black);
             drawFramedRect(buf, x + 18, y + 5, 5, 9, cMid, black);
-            // פרח מדברי בראש הקקטוס
             drawShadedCircle(buf, x + 12, y - 2, 3, red, C16(255, 130, 130), C16(160, 15, 15), black);
-            // עיניים זועמות
             drawRect(buf, x + 9,  y + 7, 2, 3, black);
             drawRect(buf, x + 13, y + 7, 2, 3, black);
             drawRect(buf, x + 9,  y + 7, 1, 1, yellow);
             drawRect(buf, x + 13, y + 7, 1, 1, yellow);
             break;
         }
-        case OBS_LOLLIPOP: { // מפלצת סוכרייה מסתובבת עם עיניים וברק!
+        case OBS_LOLLIPOP: {
             drawFramedRect(buf, x + 10, y + 12, 4, 14, white, black);
             drawShadedCircle(buf, x + 12, y + 9, 10, C16(255, 25, 145), C16(255, 140, 205), C16(185, 10, 95), black);
             drawCircle(buf, x + 12, y + 9, 7, white);
             drawCircle(buf, x + 12, y + 9, 4, C16(0, 225, 255));
             drawCircle(buf, x + 12, y + 9, 2, yellow);
-            // עיניים מרושעות על הסוכרייה
             drawFramedRect(buf, x + 7,  y + 6, 4, 4, white, black);
             drawFramedRect(buf, x + 13, y + 6, 4, 4, white, black);
-            drawRect(buf, x + 8,  y + 7, 2, 2, black);
-            drawRect(buf, x + 14, y + 7, 2, 2, black);
+            drawRect(buf, x + 8,  y + 7, 2, 2, attacking ? red : black);
+            drawRect(buf, x + 14, y + 7, 2, 2, attacking ? red : black);
             break;
         }
-        case OBS_SNAKE: { // נחש קוברה מפותל עם קשקשים, צווארון קוברה, ניבים ולשון מתפצלת!
+        case OBS_SNAKE: { // נחש קוברה מפותל שמזנק קדימה ופושט לשון וניבים בתקיפה!
             u16 sGreen = C16(48, 185, 45), sLight = C16(120, 235, 85), sDark = C16(25, 115, 25);
-            // פיתולי הגוף על הקרקע
             drawShadedCircle(buf, x + 16, y + 20, 5, sGreen, sLight, sDark, black);
             drawShadedCircle(buf, x + 9,  y + 20, 6, sGreen, sLight, sDark, black);
-            // צוואר וראש קוברה מורם
             drawShadedCircle(buf, x + 10, y + 12, 6, C16(220, 180, 60), yellow, C16(150, 100, 20), black);
             drawShadedCircle(buf, x + 8,  y + 7,  6, sGreen, sLight, sDark, black);
-            // עין אדומה, ניבים לבנים ולשון אדומה מתפצלת
             drawRect(buf, x + 5, y + 5, 3, 2, red);
-            drawRect(buf, x + 4, y + 11, 2, 3, white);
-            drawLine(buf, x + 2, y + 9, x - 3, y + 8, red);
-            drawLine(buf, x + 2, y + 9, x - 3, y + 11, red);
+            drawRect(buf, x + 4, y + 11, 2, attacking ? 5 : 3, white);
+            int tongueLen = attacking ? 7 : 3;
+            drawLine(buf, x + 2, y + 9, x - tongueLen, y + 7, red);
+            drawLine(buf, x + 2, y + 9, x - tongueLen, y + 11, red);
             break;
         }
-        case OBS_MAGMA: { // גולם לבה בוער עם סדקי אש, גבות בוערות ופה לוהט!
+        case OBS_MAGMA: {
             drawShadedCircle(buf, x + 12, y + 14, 11, C16(215, 45, 0), C16(255, 135, 0), C16(120, 15, 0), black);
             drawShadedCircle(buf, x + 12, y + 6,  8,  C16(235, 65, 0), C16(255, 165, 20), C16(135, 20, 0), black);
-            // עיניים ופה זוהרים בצהוב-לבן
             drawRect(buf, x + 7,  y + 6, 4, 3, yellow);
             drawRect(buf, x + 13, y + 6, 4, 3, yellow);
-            drawRect(buf, x + 8,  y + 13, 8, 3, yellow);
+            drawRect(buf, x + 8,  y + 13, 8, attacking ? 5 : 3, yellow);
             break;
         }
-        case OBS_PENGUIN: { // פינגווין קיסרי מפורט עם בטן לבנה, כנפיים, מקור כתום וכפות רגליים!
+        case OBS_PENGUIN: {
             drawRect(buf, x + 5,  y + 23, 5, 3, C16(255, 140, 0));
             drawRect(buf, x + 14, y + 23, 5, 3, C16(255, 140, 0));
             drawShadedCircle(buf, x + 12, y + 15, 9, C16(35, 45, 65), C16(75, 90, 120), black, black);
             drawShadedCircle(buf, x + 12, y + 7,  7, C16(35, 45, 65), C16(75, 90, 120), black, black);
             drawCircle(buf, x + 11, y + 16, 6, white);
-            // עיניים ומקור
-            drawRect(buf, x + 8, y + 5, 2, 2, white);
-            drawRect(buf, x + 8, y + 6, 1, 1, black);
-            drawFramedRect(buf, x + 2, y + 7, 6, 4, C16(255, 150, 0), black);
+            drawRect(buf, x + 8, y + 5, 2, 2, attacking ? red : white);
+            drawFramedRect(buf, x + (attacking ? 0 : 2), y + 7, 6, 4, C16(255, 150, 0), black);
             break;
         }
-        case OBS_RED_SHROOM: { // מפלצת פטרייה עם כיפה אדומה מנוקדת ועיניים כועסות!
+        case OBS_RED_SHROOM: {
             drawFramedRect(buf, x + 6, y + 12, 12, 14, C16(245, 230, 200), black);
             drawShadedCircle(buf, x + 12, y + 9, 11, red, C16(255, 110, 110), C16(165, 15, 15), black);
             drawCircle(buf, x + 7,  y + 6, 3, white);
@@ -398,37 +392,33 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
             drawCircle(buf, x + 12, y + 3, 2, white);
             drawRect(buf, x + 8,  y + 15, 2, 4, black);
             drawRect(buf, x + 14, y + 15, 2, 4, black);
+            if (attacking) drawRect(buf, x + 9, y + 20, 6, 3, red);
             break;
         }
-        case OBS_GRAVE: { // מצבת אבן עתיקה ומפורטת עם סדקים, צלב חרוט וטחב בתחתית!
+        case OBS_GRAVE: {
             drawShadedCircle(buf, x + 12, y + 8, 9, C16(135, 142, 150), C16(185, 192, 200), C16(85, 90, 98), black);
             drawFramedRect(buf, x + 3, y + 8, 18, 18, C16(135, 142, 150), black);
             drawRect(buf, x + 4, y + 9, 3, 15, C16(180, 188, 195));
-            // צלב חרוט
             drawRect(buf, x + 11, y + 5, 2, 11, C16(55, 60, 68));
             drawRect(buf, x + 8,  y + 8, 8, 2,  C16(55, 60, 68));
-            // דשא/טחב בתחתית המצבה
             drawRect(buf, x + 2, y + 23, 20, 3, C16(45, 130, 50));
             break;
         }
-        case OBS_PUMPKIN: { // דלעת האלווין מרושעת ומחורצת עם עיניים ופה משונן זוהרים!
+        case OBS_PUMPKIN: {
             drawFramedRect(buf, x + 10, y, 4, 5, C16(40, 135, 45), black);
             drawShadedCircle(buf, x + 8,  y + 14, 9, C16(235, 110, 0), C16(255, 165, 40), C16(165, 65, 0), black);
             drawShadedCircle(buf, x + 16, y + 14, 9, C16(235, 110, 0), C16(255, 165, 40), C16(165, 65, 0), black);
             drawShadedCircle(buf, x + 12, y + 14, 9, C16(255, 130, 10), C16(255, 185, 60), C16(180, 75, 0), black);
-            drawRect(buf, x + 6,  y + 10, 4, 4, yellow);
-            drawRect(buf, x + 14, y + 10, 4, 4, yellow);
-            drawRect(buf, x + 7,  y + 17, 10, 3, yellow);
-            drawRect(buf, x + 9,  y + 17, 2, 1, C16(255, 130, 10));
-            drawRect(buf, x + 13, y + 17, 2, 1, C16(255, 130, 10));
+            drawRect(buf, x + 6,  y + 10, 4, 4, attacking ? red : yellow);
+            drawRect(buf, x + 14, y + 10, 4, 4, attacking ? red : yellow);
+            drawRect(buf, x + 7,  y + 17, 10, attacking ? 5 : 3, yellow);
             break;
         }
-        default: { // גולם סלע משונן עם שכבות תלת-ממד, טחב ועיניים זוהרות!
+        default: {
             u16 base = biomeObsCol;
             drawShadedCircle(buf, x + 12, y + 14, 11, base, white, black, black);
             drawShadedCircle(buf, x + 7,  y + 18, 7,  base, white, black, black);
             drawShadedCircle(buf, x + 17, y + 18, 7,  base, white, black, black);
-            // עיניים זועמות על הסלע/מכשול
             drawFramedRect(buf, x + 6,  y + 10, 5, 4, yellow, black);
             drawFramedRect(buf, x + 13, y + 10, 5, 4, yellow, black);
             drawRect(buf, x + 7,  y + 11, 2, 2, red);
@@ -448,11 +438,15 @@ void renderTopScreen(u16* buf) {
     u16 black = C16(15, 15, 20);
     u16 white = C16(255, 255, 255);
 
-    // 1. שמיים עם גרדיאנט צבעוני מתוקן ומדויק
+    // 1. שמיים עם מעבר הדרגתי ומציאותי בין ביומות!
+    int stR = (int)smoothSkyTop[0], stG = (int)smoothSkyTop[1], stB = (int)smoothSkyTop[2];
+    int sbR = (int)smoothSkyBot[0], sbG = (int)smoothSkyBot[1], sbB = (int)smoothSkyBot[2];
+    int grR = (int)smoothGround[0], grG = (int)smoothGround[1], grB = (int)smoothGround[2];
+
     for (int y = 0; y < GROUND_Y; y++) {
-        int r  = b->skyTop[0] + ((b->skyBot[0] - b->skyTop[0]) * y) / GROUND_Y;
-        int g  = b->skyTop[1] + ((b->skyBot[1] - b->skyTop[1]) * y) / GROUND_Y;
-        int bl = b->skyTop[2] + ((b->skyBot[2] - b->skyTop[2]) * y) / GROUND_Y;
+        int r  = stR + ((sbR - stR) * y) / GROUND_Y;
+        int g  = stG + ((sbG - stG) * y) / GROUND_Y;
+        int bl = stB + ((sbB - stB) * y) / GROUND_Y;
         u16 rowCol = rgb8To16_fixed(r, g, bl);
         u16* row = &buf[y * SCREEN_W];
         for (int x = 0; x < SCREEN_W; x++) row[x] = rowCol;
@@ -477,8 +471,8 @@ void renderTopScreen(u16* buf) {
         drawCircle(buf, 220, 36, 13, C16(255, 250, 190));
     }
 
-    // 3. שכבת הרים וגבעות רחוקים באופק (Parallax Layer)
-    drawDistantHills(buf, b, frames / 2);
+    // 3. שכבת הרים וגבעות רחוקים באופק (Parallax Layer) עם צבעים מתמזגים
+    drawDistantHills(buf, frames / 2);
 
     // 4. אלמנטי תפאורה עשירים ברקע
     for (int i = 0; i < 6; i++) {
@@ -487,25 +481,22 @@ void renderTopScreen(u16* buf) {
         }
     }
 
-    // 5. אדמה מפורטת עם שכבת דשא/ציפוי עליונה, להבי דשא, אבנים ופרחים!
-    u16 topTurfLight = rgb8To16_fixed(b->ground[0] + 45, b->ground[1] + 55, b->ground[2] + 35);
-    u16 topTurfBase  = rgb8To16_fixed(b->ground[0] + 15, b->ground[1] + 25, b->ground[2] + 15);
-    u16 dirtDark     = rgb8To16_fixed(b->ground[0] - 45, b->ground[1] - 45, b->ground[2] - 45);
+    // 5. אדמה מפורטת עם מעבר צבעים הדרגתי בין ביומות!
+    u16 topTurfLight = rgb8To16_fixed(grR + 45, grG + 55, grB + 35);
+    u16 topTurfBase  = rgb8To16_fixed(grR + 15, grG + 25, grB + 15);
+    u16 dirtDark     = rgb8To16_fixed(grR - 45, grG - 45, grB - 45);
 
-    // קו מתאר עליון ושכבת הדשא
     drawRect(buf, 0, GROUND_Y, SCREEN_W, 1, black);
     drawRect(buf, 0, GROUND_Y + 1, SCREEN_W, 3, topTurfLight);
     drawRect(buf, 0, GROUND_Y + 4, SCREEN_W, 4, topTurfBase);
 
-    // גוף האדמה עם טקסטורה מדורגת
     for (int y = GROUND_Y + 8; y < SCREEN_H; y++) {
         int depth = (y - (GROUND_Y + 8)) * 2;
-        u16 gCol = rgb8To16_fixed(b->ground[0] - 20 - depth, b->ground[1] - 25 - depth, b->ground[2] - 20 - depth);
+        u16 gCol = rgb8To16_fixed(grR - 20 - depth, grG - 25 - depth, grB - 20 - depth);
         u16* row = &buf[y * SCREEN_W];
         for (int x = 0; x < SCREEN_W; x++) row[x] = gCol;
     }
 
-    // להבי דשא/שפה משוננת ואבנים קטנות שנגללים עם המהירות!
     int groundScroll = (int)(frames * currentSpeed);
     for (int gx = 0; gx < SCREEN_W; gx += 8) {
         int worldX = gx + groundScroll;
@@ -513,7 +504,6 @@ void renderTopScreen(u16* buf) {
         drawRect(buf, gx, GROUND_Y + 8, 6, 2 + overhang, topTurfBase);
         drawRect(buf, gx, GROUND_Y + 10 + overhang, 6, 1, dirtDark);
 
-        // חלוקי נחל וסלעים בתוך האדמה
         if (((worldX / 8) % 3) == 0) {
             int py = GROUND_Y + 18 + (((worldX / 8) * 7) % 16);
             drawFramedRect(buf, gx, py, 6, 4, dirtDark, black);
@@ -528,10 +518,10 @@ void renderTopScreen(u16* buf) {
         drawFramedRect(buf, px - i * 5, py + wave - 2, 6, 5, white, C16(200, 40, 40));
     }
 
-    // 7. ציור הדמות המשודרגת של השחקן
-    drawCharacterSprite(buf, selectedCharIdx, (int)player.x + 12, (int)player.y + 12, 100, (gameState == STATE_PLAYING), player.grounded, player.angle, frames);
+    // 7. ציור הדמות המשודרגת של השחקן עם 4 האנימציות והבעות הפנים!
+    drawCharacterSpriteEx(buf, selectedCharIdx, (int)player.x + 12, (int)player.y + 12, 100, playerAnimState, currentFaceExpr, player.angle, frames);
 
-    // 8. אויבים ומכשולים מפורטים
+    // 8. אויבים ומכשולים מפורטים (כולל אנימציית תקיפה לאויבים חיים!)
     for (int i = 0; i < 6; i++) {
         if (obstacles[i].active) {
             drawObstacleReal(buf, &obstacles[i], b->obsColor, frames);
