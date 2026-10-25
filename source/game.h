@@ -130,6 +130,17 @@ typedef struct {
     u8 specialAcc; // 0=כובע, 1=כתר, 2=מצנפת קוסם, 3=קרניים, 4=הילה, 5=קסדה, 6=מסכה
 } CharData;
 
+// מפרט גיאומטרי ייחודי לכל אחד מ-200 האלמנטים בכל קטגוריה (בקובץ custom_parts_db.c)
+typedef struct {
+    u8 baseShape;
+    u8 subPattern;
+    u8 extraOrnament;
+    s8 modWidth;
+    s8 modHeight;
+    s8 offsetY;
+    u8 accentTone;
+} CustomPartSpec;
+
 // מבנה הדמות בהרכבה אישית (14 קטגוריות מלאות כולל גבות, קמירות, אפים, פיות, שיער ואביזרים!)
 typedef struct {
     char nameHeb[24];
@@ -229,7 +240,11 @@ void savePermanentData(void);
 void loadPermanentData(void);
 int getRequiredBiomeForChar(int cIdx);
 
-// פונקציות ההרכבה האישית והמשימות (בקובץ custom_char.c)
+// פונקציות ההרכבה האישית (בקובץ custom_char.c ובקובץ custom_parts_db.c)
+u16 getCustomPaletteColor(int colIdx);
+void initCustomPartsDatabase(void);
+const CustomPartSpec* getCustomPartSpec(int category, int styleIdx);
+void renderStoredCustomPart(u16* buf, int cat, int styleIdx, u16 mainCol, int hx, int hy, int x, int y, int s, int legL, int legR, enum FaceExpr faceExpr);
 void initDefaultCustomChar(void);
 void pickNewTempMission(void);
 const char* getActiveMissionDesc(void);
@@ -237,6 +252,19 @@ void checkMissionAndRecordUnlocks(int dispScore, int biomeIdx, bool brokeRecord)
 void drawCustomCharacterSprite(u16* buf, int cx, int cy, int scalePct, enum CharAnimState animState, enum FaceExpr faceExpr, int frameCnt);
 void renderCustomizerScreen(u16* buf);
 void handleCustomizerTouch(int tx, int ty);
+
+// פונקציות מחולל המשימות הפרוצדורלי (בקובץ missions_proc.c)
+void generateProceduralMission(void);
+const char* getProceduralMissionText(void);
+void notifyProceduralMissionEvent(int dispScore, int biomeIdx, int coinsAdded, int jumpsAdded, bool brokeRecord);
+
+// פונקציות המוזיקה הפרוצדורלית וצלילי הדמויות והפגיעה (בקובץ audio_proc.c)
+void initProceduralAudio(void);
+void updateProceduralAudio(void);
+void playCharacterVoiceSfx(int charIdx);
+void playCoinSfx(bool isDiamond);
+void playHitSfx(bool isAirHit);
+void playMissionCompleteSfx(void);
 
 // פונקציות עזר וציור
 u16 rgb8To16(int r, int g, int b);
