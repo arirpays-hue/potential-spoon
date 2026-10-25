@@ -101,7 +101,7 @@ static void drawDetailedCloud(u16* buf, int x, int y) {
     drawRect(buf, x - 12, y + 5, 24, 5, shadow);
 }
 
-// ציור שכבת הרים וגבעות רחוקות באופק עם צבעים שעוברים בהדרגתיות!
+// ציור שכבת הרים וגבעות רחוקות באופק (נשארות יציבות בעצירה ובתפריט!)
 static void drawDistantHills(u16* buf, int scrollOffset) {
     int r  = ((int)smoothSkyBot[0] + (int)smoothGround[0]) / 2;
     int g  = ((int)smoothSkyBot[1] + (int)smoothGround[1]) / 2;
@@ -281,7 +281,7 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
             drawCircle(buf, x + 14, y + 8, 2, black);
             drawCircle(buf, x + 7,  y + 8, 1, red);
             drawCircle(buf, x + 13, y + 8, 1, red);
-            if (attacking) { // פה פעור לרוח הרפאים בתקיפה!
+            if (attacking) {
                 drawCircle(buf, x + 10, y + 13, 3, black);
             }
             return;
@@ -295,7 +295,7 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
             int bladeW = ((frameCnt / 2) % 2 == 0) ? 22 : 10;
             drawRect(buf, x + 12 - bladeW / 2, y + 1, bladeW, 2, C16(0, 240, 255));
             drawRect(buf, x + 11, y + 3, 2, 3, black);
-            if (attacking) { // קרן לייזר בתקיפה!
+            if (attacking) {
                 drawLine(buf, x + 6, y + 10, x - 8, y + 14, red);
             }
             return;
@@ -311,7 +311,6 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
         drawFramedRect(buf, x + 18, y + 7, 7, 5, wingCol, black);
         drawShadedCircle(buf, x + 13, y + 10, 6, bodyBase, bodyLight, bodyBase, black);
         drawShadedCircle(buf, x + 7,  y + 8,  5, bodyBase, bodyLight, bodyBase, black);
-        // מקור פעור בתקיפה או סגור בתעופה רגילה!
         if (attacking) {
             drawLine(buf, x + 3, y + 6, x - 3, y + 4, yellow);
             drawLine(buf, x + 3, y + 9, x - 3, y + 11, yellow);
@@ -353,7 +352,7 @@ static void drawObstacleReal(u16* buf, Obstacle* o, u16 biomeObsCol, int frameCn
             drawRect(buf, x + 14, y + 7, 2, 2, attacking ? red : black);
             break;
         }
-        case OBS_SNAKE: { // נחש קוברה מפותל שמזנק קדימה ופושט לשון וניבים בתקיפה!
+        case OBS_SNAKE: {
             u16 sGreen = C16(48, 185, 45), sLight = C16(120, 235, 85), sDark = C16(25, 115, 25);
             drawShadedCircle(buf, x + 16, y + 20, 5, sGreen, sLight, sDark, black);
             drawShadedCircle(buf, x + 9,  y + 20, 6, sGreen, sLight, sDark, black);
@@ -438,6 +437,9 @@ void renderTopScreen(u16* buf) {
     u16 black = C16(15, 15, 20);
     u16 white = C16(255, 255, 255);
 
+    // חישוב היסט הגלילה מבוסס על מרחק התנועה בפועל (נעצר לחלוטין בעצירה ובתפריט הראשי!)
+    int groundScroll = (int)worldScrollX;
+
     // 1. שמיים עם מעבר הדרגתי ומציאותי בין ביומות!
     int stR = (int)smoothSkyTop[0], stG = (int)smoothSkyTop[1], stB = (int)smoothSkyTop[2];
     int sbR = (int)smoothSkyBot[0], sbG = (int)smoothSkyBot[1], sbB = (int)smoothSkyBot[2];
@@ -458,7 +460,7 @@ void renderTopScreen(u16* buf) {
         drawCircle(buf, 215, 30, 3, C16(200, 210, 230));
         drawCircle(buf, 224, 38, 4, C16(200, 210, 230));
         for (int i = 0; i < 24; i++) {
-            int sx = (i * 41 + frames / 4) % SCREEN_W;
+            int sx = (i * 41 + groundScroll / 12) % SCREEN_W;
             int sy = (i * 23) % (GROUND_Y - 40);
             buf[sy * SCREEN_W + sx] = white;
             if (i % 3 == 0 && sx + 1 < SCREEN_W && sy + 1 < SCREEN_H) {
@@ -471,8 +473,8 @@ void renderTopScreen(u16* buf) {
         drawCircle(buf, 220, 36, 13, C16(255, 250, 190));
     }
 
-    // 3. שכבת הרים וגבעות רחוקים באופק (Parallax Layer) עם צבעים מתמזגים
-    drawDistantHills(buf, frames / 2);
+    // 3. שכבת הרים וגבעות רחוקים באופק (נעצרת כשהמשחק עוצר!)
+    drawDistantHills(buf, groundScroll / 6);
 
     // 4. אלמנטי תפאורה עשירים ברקע
     for (int i = 0; i < 6; i++) {
@@ -481,7 +483,7 @@ void renderTopScreen(u16* buf) {
         }
     }
 
-    // 5. אדמה מפורטת עם מעבר צבעים הדרגתי בין ביומות!
+    // 5. אדמה מפורטת שעוצרת לחלוטין מתחת לרגלי השחקן בעצירה או בתפריט הראשי!
     u16 topTurfLight = rgb8To16_fixed(grR + 45, grG + 55, grB + 35);
     u16 topTurfBase  = rgb8To16_fixed(grR + 15, grG + 25, grB + 15);
     u16 dirtDark     = rgb8To16_fixed(grR - 45, grG - 45, grB - 45);
@@ -497,28 +499,30 @@ void renderTopScreen(u16* buf) {
         for (int x = 0; x < SCREEN_W; x++) row[x] = gCol;
     }
 
-    int groundScroll = (int)(frames * currentSpeed);
-    for (int gx = 0; gx < SCREEN_W; gx += 8) {
-        int worldX = gx + groundScroll;
-        int overhang = ((worldX / 8) * 13) % 5;
+    // ציור להבי הדשא וחלוקי הנחל במיקום המדויק לפי worldScrollX (יציב ב-100% בעצירה!)
+    int subTileOff = groundScroll % 8;
+    for (int gx = -subTileOff; gx < SCREEN_W; gx += 8) {
+        int tileIdx = (gx + groundScroll) / 8;
+        int overhang = (tileIdx * 13) % 5;
+        if (overhang < 0) overhang = -overhang;
         drawRect(buf, gx, GROUND_Y + 8, 6, 2 + overhang, topTurfBase);
         drawRect(buf, gx, GROUND_Y + 10 + overhang, 6, 1, dirtDark);
 
-        if (((worldX / 8) % 3) == 0) {
-            int py = GROUND_Y + 18 + (((worldX / 8) * 7) % 16);
+        if ((tileIdx % 3) == 0) {
+            int py = GROUND_Y + 18 + ((tileIdx * 7) % 16);
             drawFramedRect(buf, gx, py, 6, 4, dirtDark, black);
         }
     }
 
-    // 6. צעיף גיבור מתנופף עם מסגרת
+    // 6. צעיף גיבור (מתנופף רק בזמן ריצה, נח בעצירה!)
     int px = (int)player.x + 12;
     int py = (int)player.y + 12;
     for (int i = 1; i < 6; i++) {
-        int wave = ((frames / 3 + i) % 2 == 0) ? -2 : 2;
+        int wave = (gameState == STATE_PLAYING) ? (((frames / 3 + i) % 2 == 0) ? -2 : 2) : (i / 2);
         drawFramedRect(buf, px - i * 5, py + wave - 2, 6, 5, white, C16(200, 40, 40));
     }
 
-    // 7. ציור הדמות המשודרגת של השחקן עם 4 האנימציות והבעות הפנים!
+    // 7. ציור הדמות המשודרגת של השחקן עם 4 האנימציות והבעות הפנים הריאליסטיות!
     drawCharacterSpriteEx(buf, selectedCharIdx, (int)player.x + 12, (int)player.y + 12, 100, playerAnimState, currentFaceExpr, player.angle, frames);
 
     // 8. אויבים ומכשולים מפורטים (כולל אנימציית תקיפה לאויבים חיים!)
