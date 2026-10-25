@@ -1,12 +1,10 @@
 #include "game.h"
-#include <fat.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #define C16(r,g,b) (0x8000 | (((b)>>3)<<10) | (((g)>>3)<<5) | ((r)>>3))
-#define SAVE_MAGIC 0x4A4D5039 // חתימת זיהוי לשמירת מטבעות, דמויות ושיאים
+#define SAVE_MAGIC 0x4A4D5038 // חתימת זיהוי מעודכנת לכלכלה החדשה ולשמירת השיאים לתמיד
 
 enum GameState gameState = STATE_START;
 Player player;
@@ -15,8 +13,7 @@ int highScore = 0;
 int topScores[3] = {0, 0, 0};
 int bestBiomeIdx = 0;
 int totalGamesPlayed = 0;
-int coinsCount = 0;       // מטבעות נוכחיים לקנייה בחנות (נשמרים לתמיד!)
-int totalCoinsEarned = 0; // סך כל המטבעות שהורווחו אי פעם (נשמר לתמיד!)
+int coinsCount = 0; // מתחילים מ-0 מטבעות כדי שלא יהיה ניתן לקנות דמויות על הסבב הראשון!
 int selectedCharIdx = 0;
 bool unlockedChars[NUM_CHARS] = {false};
 int currentBiomeIdx = 0;
@@ -29,6 +26,7 @@ static int countdownFrames = 0;
 int bubbleTimer = 0;
 const char* bubbleText = NULL;
 const char* currentRoastText = NULL;
+const char* currentWarningText = NULL; // הודעת האזהרה המדויקת לאויב שבמסלול התנגשות!
 enum ObsType lastDeathObs = OBS_ROCK;
 
 // משתני מצב ל-4 האנימציות של הדמות, הבעות הפנים ומעבר הביומות ההדרגתי
@@ -45,13 +43,10 @@ Coin coins[6];
 BgElement bgElements[6];
 EnvParticle envParticles[25];
 
-// יישור זיכרון של 32 בייט למניעת שיבושי תצוגה בהעברת DMA!
-static u16 topBuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
-static u16 bottomBuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
+static u16 topBuffer[SCREEN_W * SCREEN_H];
+static u16 bottomBuffer[SCREEN_W * SCREEN_H];
 
-static bool fatReady = false;
-
-// מבנה הנתונים שנשמר לתמיד על כרטיס ה-SD
+// מבנה הנתונים שנשמר לתמיד בזיכרון הקונסולה/כרטיס
 typedef struct {
     u32 magic;
     int highScore;
@@ -59,15 +54,12 @@ typedef struct {
     int bestBiomeIdx;
     int totalGamesPlayed;
     int coinsCount;
-    int totalCoinsEarned;
     int selectedCharIdx;
     u8 unlocked[NUM_CHARS];
 } SaveFileData;
 
-// שמירה בטוחה ותקנית באמצעות libfat (מונעת לחלוטין את מסך הזבל הגרפי!)
+// שמירה בטוחה וישירה לתמיד לזיכרון ה-SRAM של ה-DS (ללא fopen שגורם למסך לבן!)
 void savePermanentData(void) {
-    if (!fatReady) return;
-
     SaveFileData data;
     memset(&data, 0, sizeof(SaveFileData));
     data.magic = SAVE_MAGIC;
@@ -78,44 +70,44 @@ void savePermanentData(void) {
     data.bestBiomeIdx = bestBiomeIdx;
     data.totalGamesPlayed = totalGamesPlayed;
     data.coinsCount = coinsCount;
-    data.totalCoinsEarned = totalCoinsEarned;
     data.selectedCharIdx = selectedCharIdx;
     for (int i = 0; i < NUM_CHARS; i++) {
         data.unlocked[i] = unlockedChars[i] ? 1 : 0;
     }
 
-    FILE* fp = fopen("jumper_ds.sav", "wb");
-    if (fp) {
-        fwrite(&data, sizeof(SaveFileData), 1, fp);
-        fclose(fp);
+    sysSetCartOwner(BUS_OWNER_ARM9);
+    volatile u8* sram = (volatile u8*)0x0A000000;
+    const u8* src = (const u8*)&data;
+    for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
+        sram[i] = src[i];
     }
 }
 
-// טעינה בטוחה של המטבעות שהורווחו, השיאים והדמויות
+// טעינה בטוחה ומידית של כל השיאים והנתונים שנשמרו לתמיד בעת הדלקת המשחק
 void loadPermanentData(void) {
-    if (!fatReady) return;
-
     SaveFileData data;
     memset(&data, 0, sizeof(SaveFileData));
 
-    FILE* fp = fopen("jumper_ds.sav", "rb");
-    if (fp) {
-        if (fread(&data, sizeof(SaveFileData), 1, fp) == 1 && data.magic == SAVE_MAGIC) {
-            highScore = (data.highScore >= 0) ? data.highScore : 0;
-            topScores[0] = (data.topScores[0] >= 0) ? data.topScores[0] : 0;
-            topScores[1] = (data.topScores[1] >= 0) ? data.topScores[1] : 0;
-            topScores[2] = (data.topScores[2] >= 0) ? data.topScores[2] : 0;
-            bestBiomeIdx = (data.bestBiomeIdx >= 0 && data.bestBiomeIdx < NUM_BIOMES) ? data.bestBiomeIdx : 0;
-            totalGamesPlayed = (data.totalGamesPlayed >= 0) ? data.totalGamesPlayed : 0;
-            coinsCount = (data.coinsCount >= 0) ? data.coinsCount : 0;
-            totalCoinsEarned = (data.totalCoinsEarned >= 0) ? data.totalCoinsEarned : coinsCount;
-            selectedCharIdx = (data.selectedCharIdx >= 0 && data.selectedCharIdx < NUM_CHARS) ? data.selectedCharIdx : 0;
-            for (int i = 0; i < NUM_CHARS; i++) {
-                unlockedChars[i] = (data.unlocked[i] != 0);
-            }
-            unlockedChars[0] = true;
+    sysSetCartOwner(BUS_OWNER_ARM9);
+    volatile u8* sram = (volatile u8*)0x0A000000;
+    u8* dst = (u8*)&data;
+    for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
+        dst[i] = sram[i];
+    }
+
+    if (data.magic == SAVE_MAGIC) {
+        highScore = (data.highScore >= 0) ? data.highScore : 0;
+        topScores[0] = (data.topScores[0] >= 0) ? data.topScores[0] : 0;
+        topScores[1] = (data.topScores[1] >= 0) ? data.topScores[1] : 0;
+        topScores[2] = (data.topScores[2] >= 0) ? data.topScores[2] : 0;
+        bestBiomeIdx = (data.bestBiomeIdx >= 0 && data.bestBiomeIdx < NUM_BIOMES) ? data.bestBiomeIdx : 0;
+        totalGamesPlayed = (data.totalGamesPlayed >= 0) ? data.totalGamesPlayed : 0;
+        coinsCount = (data.coinsCount >= 0) ? data.coinsCount : 0;
+        selectedCharIdx = (data.selectedCharIdx >= 0 && data.selectedCharIdx < NUM_CHARS) ? data.selectedCharIdx : 0;
+        for (int i = 0; i < NUM_CHARS; i++) {
+            unlockedChars[i] = (data.unlocked[i] != 0);
         }
-        fclose(fp);
+        unlockedChars[0] = true;
     }
 }
 
@@ -164,6 +156,7 @@ static void resetGame(void) {
 
     playerAnimState = CHAR_ANIM_WALK;
     currentFaceExpr = EXPR_NORMAL;
+    currentWarningText = NULL;
     happyFaceTimer = 0;
     deathAnimTimer = 0;
 
@@ -189,6 +182,40 @@ static void resetGame(void) {
 
 static void triggerJump(void) {
     player.jumpBuffer = 8;
+}
+
+// סימולציית חיזוי מסלול מדויקת: בודקת אם השחקן והאויב באמת הולכים להתנגש אם השחקן לא ישנה מסלול!
+static bool willPlayerCollideWithObstacle(const Obstacle* o, float grav) {
+    int pad = 5;
+    float simY  = player.y;
+    float simDY = player.dy;
+    float simOx = o->x;
+
+    // אם האויב כבר עבר את השחקן או רחוק מדי - אין סכנת התנגשות מידית
+    if (simOx + o->w - pad <= player.x + pad) return false;
+    float maxLookahead = 55.0f + currentSpeed * 12.0f;
+    if (simOx - (player.x + player.w) > maxLookahead) return false;
+
+    // הדמיית עד 32 פריימים קדימה לפי הפיזיקה האמיתית של המשחק
+    for (int step = 0; step < 32; step++) {
+        if (player.x + pad < simOx + o->w - pad &&
+            player.x + player.w - pad > simOx + pad &&
+            simY + pad < o->y + o->h - pad &&
+            simY + player.h - pad > o->y + pad) {
+            return true; // זוהתה התנגשות ודאית במסלול הנוכחי!
+        }
+
+        simOx -= currentSpeed;
+        simDY += grav;
+        simY  += simDY;
+        if (simY + player.h >= GROUND_Y) {
+            simY = GROUND_Y - player.h;
+            simDY = 0.0f;
+        }
+
+        if (simOx + o->w < player.x) break;
+    }
+    return false;
 }
 
 static void updateGamePhysics(void) {
@@ -228,25 +255,25 @@ static void updateGamePhysics(void) {
     float speedBonus = (dispScore < 1500) ? (dispScore * 0.0011f) : (1.65f + (dispScore - 1500) * 0.00035f);
     float biomeBoost = currentBiomeIdx * 0.04f;
     currentSpeed = 3.2f + speedBonus + biomeBoost;
-    if (currentSpeed > 6.4f) currentSpeed = 6.4f;
+    if (currentSpeed > 6.4f) currentSpeed = 6.4f; // תקרת מהירות מאתגרת אך הוגנת ואפשרית למעבר!
 
     // קידום מרחק הקרקע אך ורק כשמשחקים בפועל!
     worldScrollX += currentSpeed;
 
     // פיזיקת קפיצה אדפטיבית: מתחדדת עם המהירות כדי שהנחיתה תהיה מהירה ומדויקת במהירויות גבוהות!
-    float speedRatio = currentSpeed / 3.2f;
+    float speedRatio = currentSpeed / 3.2f; // נע בין 1.0 ל-2.0
     enum AnimStyle style = CHARACTERS[selectedCharIdx].style;
     float grav = 0.45f * (0.85f + 0.15f * speedRatio);
     float jumpForce = -7.8f * (0.92f + 0.08f * speedRatio);
 
     if (style == STYLE_FLOAT) {
-        grav = 0.32f * (0.85f + 0.15f * speedRatio);
+        grav = 0.32f * (0.85f + 0.15f * speedRatio); // חייזר / אסטרונאוט / מלאך מרחפים אך נוחתים בזמן!
         jumpForce = -6.9f * (0.92f + 0.08f * speedRatio);
     } else if (style == STYLE_HEAVY) {
-        grav = 0.58f * (0.85f + 0.15f * speedRatio);
+        grav = 0.58f * (0.85f + 0.15f * speedRatio); // אביר / קינג קונג / גודזילה קופצים חזק ונוחתים כבד!
         jumpForce = -8.8f * (0.92f + 0.08f * speedRatio);
     } else if (style == STYLE_BOUNCE) {
-        jumpForce = -8.2f * (0.92f + 0.08f * speedRatio);
+        jumpForce = -8.2f * (0.92f + 0.08f * speedRatio); // המבורגר / סליים / חיות קופצניות!
     }
 
     if (player.jumpBuffer > 0) player.jumpBuffer--;
@@ -260,7 +287,7 @@ static void updateGamePhysics(void) {
         player.coyoteTimer = 0;
     }
 
-    // קיצור קפיצה אם עוזבים את הכפתור/מגע
+    // קיצור קפיצה אם עוזבים את הכפתור/מגע (מאפשר נחיתה מהירה ומדויקת בין מכשולים מהירים!)
     int held = keysHeld();
     if (!(held & (KEY_A | KEY_UP | KEY_B | KEY_TOUCH)) && player.dy < -3.0f) {
         player.dy = -3.0f;
@@ -292,7 +319,7 @@ static void updateGamePhysics(void) {
         }
     }
 
-    // יצירת מכשולים עם מרווח בטיחות מובטח
+    // יצירת מכשולים עם מרווח בטיחות מובטח כדי שהמשחק תמיד יהיה אפשרי למעבר גם במהירות שיא!
     float rightmostObsX = -100.0f;
     for (int i = 0; i < 6; i++) {
         if (obstacles[i].active && obstacles[i].x > rightmostObsX) {
@@ -300,6 +327,7 @@ static void updateGamePhysics(void) {
         }
     }
 
+    // מרחק מינימלי בין מכשולים שגדל יחד עם המהירות כך שתמיד יש זמן לנחות ולקפוץ שוב!
     float minSafeGap = 86.0f + currentSpeed * 15.5f + (rand() % 28);
 
     if (SCREEN_W - rightmostObsX >= minSafeGap) {
@@ -342,18 +370,23 @@ static void updateGamePhysics(void) {
         }
     }
 
-    // בדיקה אם אויב או מכשול קרובים לשחקן
-    bool dangerNear = false;
-    float dangerRange = 65.0f + currentSpeed * 6.0f;
+    // זיהוי מדויק: האם השחקן נמצא במסלול התנגשות ישיר עם אחד האויבים?
+    bool collisionCourse = false;
+    float closestThreatX = 9999.0f;
+    enum ObsType threatType = OBS_ROCK;
 
     // תנועת מכשולים ובדיקת התנגשות
     for (int i = 0; i < 6; i++) {
         if (obstacles[i].active) {
             obstacles[i].x -= currentSpeed;
 
-            float dist = obstacles[i].x - (player.x + player.w);
-            if (dist > -10.0f && dist < dangerRange) {
-                dangerNear = true;
+            // הפחד מופעל אך ורק אם חיזוי המסלול מזהה שהם באמת הולכים להתנגש!
+            if (willPlayerCollideWithObstacle(&obstacles[i], grav)) {
+                if (obstacles[i].x < closestThreatX) {
+                    closestThreatX = obstacles[i].x;
+                    threatType = obstacles[i].type;
+                    collisionCourse = true;
+                }
             }
 
             int pad = 5;
@@ -363,9 +396,10 @@ static void updateGamePhysics(void) {
                 player.y + player.h - pad > obstacles[i].y + pad) {
             
                 lastDeathObs = obstacles[i].type;
-                obstacles[i].hitAnimTimer = 1;
+                obstacles[i].hitAnimTimer = 1; // מפעיל אנימציית תקיפה לאויב הפוגע!
                 deathAnimTimer = 1;
 
+                // בחירת אנימציית הפגיעה הייחודית לדמות: אויב מעופף לעומת אויב קרקע!
                 if (lastDeathObs >= OBS_BIRD_START) {
                     playerAnimState = CHAR_ANIM_HIT_AIR;
                 } else {
@@ -374,8 +408,9 @@ static void updateGamePhysics(void) {
                 currentFaceExpr = EXPR_HURT;
 
                 int finalSc = score / 10;
-                recordNewScore(finalSc, currentBiomeIdx); // שומר גם את השיאים וגם את המטבעות שהורווחו!
+                recordNewScore(finalSc, currentBiomeIdx); // שמירת השיאים לתמיד!
 
+                // שליפת עקיצה מותאמת אישית ממאגר ה-C הענק!
                 currentRoastText = getRoastForDeath(lastDeathObs, finalSc, selectedCharIdx, currentBiomeIdx);
                 gameState = STATE_GAMEOVER;
                 return;
@@ -384,31 +419,33 @@ static void updateGamePhysics(void) {
         }
     }
 
-    // תנועת מטבעות, צבירה ושמירת נתוני מטבעות שהורווחו!
+    // תנועת מטבעות ואיסוף
     for (int i = 0; i < 6; i++) {
         if (coins[i].active) {
             coins[i].x -= currentSpeed;
             if (player.x < coins[i].x + 12 && player.x + player.w > coins[i].x &&
                 player.y < coins[i].y + 12 && player.y + player.h > coins[i].y) {
                 coinsCount += coins[i].value;
-                totalCoinsEarned += coins[i].value; // צבירת סך כל המטבעות שהורווחו אי פעם!
-                happyFaceTimer = 45;
+                happyFaceTimer = 45; // הבעת פנים שמחה בדמות שבמסך התחתון!
                 if (coins[i].value == 20) showBubble("יהלום!");
                 coins[i].active = false;
-                savePermanentData(); // שמירה מידית לקובץ השמירה!
+                savePermanentData(); // שמירה מידית של המטבעות לתמיד!
             } else if (coins[i].x < -20) {
                 coins[i].active = false;
             }
         }
     }
 
-    // עדכון הבעת הפנים הדינמית של הדמות
-    if (dangerNear) {
+    // עדכון הבעת הפנים הדינמית של הדמות והודעת האזהרה הספציפית לאויב במסך התחתון!
+    if (collisionCourse) {
         currentFaceExpr = EXPR_SCARED;
+        currentWarningText = getWarningForObstacle(threatType);
     } else if (happyFaceTimer > 0) {
         currentFaceExpr = EXPR_HAPPY;
+        currentWarningText = NULL;
     } else {
         currentFaceExpr = EXPR_NORMAL;
+        currentWarningText = NULL;
     }
 
     // חלקיקי מזג אוויר לפי הביומה
@@ -432,10 +469,7 @@ static void updateGamePhysics(void) {
 }
 
 int main(void) {
-    // 1. הפעלת שני המסכים ואיפוס מלא של ה-VRAM כדי למנוע כל זבל גרפי בפתיחה!
-    powerOn(POWER_ALL_2D);
-    lcdMainOnTop();
-
+    // 1. אתחול מיידי של שני המסכים כדי למנוע מסך לבן בכניסה!
     videoSetMode(MODE_5_2D);
     vramSetBankA(VRAM_A_MAIN_BG);
     int bgTop = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
@@ -446,18 +480,9 @@ int main(void) {
     int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     u16* vramBottom = bgGetGfxPtr(bgSub);
 
-    // ניקוי מוחלט של הבאפרים וזיכרון המסכים לפני הציור הראשון
-    memset(topBuffer, 0, sizeof(topBuffer));
-    memset(bottomBuffer, 0, sizeof(bottomBuffer));
-    dmaFillHalfWords(C16(15, 22, 42), vramTop, 256 * 256 * 2);
-    dmaFillHalfWords(C16(15, 22, 42), vramBottom, 256 * 256 * 2);
-
     srand(time(NULL));
-    unlockedChars[0] = true;
-
-    // 2. אתחול תקני של מערכת הקבצים (libfat) וטעינת המטבעות והשיאים!
-    fatReady = fatInitDefault();
-    loadPermanentData();
+    unlockedChars[0] = true; // דמות ברירת מחדל פתוחה
+    loadPermanentData();     // טעינה בטוחה מה-SRAM ללא fopen!
 
     resetGame();
     gameState = STATE_START;
@@ -538,12 +563,12 @@ int main(void) {
                     if (tx >= bx && tx <= bx + 72 && ty >= by && ty <= by + 58) {
                         if (unlockedChars[cIdx]) {
                             selectedCharIdx = cIdx;
-                            savePermanentData();
+                            savePermanentData(); // שמירת הדמות שנבחרה לתמיד!
                         } else if (coinsCount >= CHARACTERS[cIdx].price) {
                             coinsCount -= CHARACTERS[cIdx].price;
                             unlockedChars[cIdx] = true;
                             selectedCharIdx = cIdx;
-                            savePermanentData();
+                            savePermanentData(); // שמירת הרכישה לתמיד!
                         }
                     }
                 }
@@ -560,16 +585,16 @@ int main(void) {
             }
         }
 
-        // רינדור שני המסכים, ניקוי מטמון והעברה מסונכרנת ל-VRAM
+        // רינדור שני המסכים, ניקוי מטמון והעברה מהירה ב-DMA ל-VRAM
         renderTopScreen(topBuffer);
         renderBottomScreen(bottomBuffer);
 
-        DC_FlushRange(topBuffer, sizeof(topBuffer));
-        DC_FlushRange(bottomBuffer, sizeof(bottomBuffer));
+        DC_FlushRange(topBuffer, SCREEN_W * SCREEN_H * 2);
+        DC_FlushRange(bottomBuffer, SCREEN_W * SCREEN_H * 2);
 
         swiWaitForVBlank();
-        dmaCopyHalfWords(3, topBuffer, vramTop, sizeof(topBuffer));
-        dmaCopyHalfWords(3, bottomBuffer, vramBottom, sizeof(bottomBuffer));
+        dmaCopy(topBuffer, vramTop, SCREEN_W * SCREEN_H * 2);
+        dmaCopy(bottomBuffer, vramBottom, SCREEN_W * SCREEN_H * 2);
     }
     return 0;
 }
