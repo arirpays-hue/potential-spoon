@@ -1,19 +1,26 @@
 #include "game.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #define C16(r,g,b) (0x8000 | (((b)>>3)<<10) | (((g)>>3)<<5) | ((r)>>3))
+#define SAVE_MAGIC 0x4A4D5038 // חתימת זיהוי מעודכנת לכלכלה החדשה ולשמירת השיאים לתמיד
 
 enum GameState gameState = STATE_START;
 Player player;
 int score = 0;
 int highScore = 0;
-int coinsCount = 250; // מטבעות התחלתיים כדי שתוכל לנסות דמויות מיד!
+int topScores[3] = {0, 0, 0};
+int bestBiomeIdx = 0;
+int totalGamesPlayed = 0;
+int coinsCount = 0; // מתחילים מ-0 מטבעות כדי שלא יהיה ניתן לקנות דמויות על הסבב הראשון!
 int selectedCharIdx = 0;
 bool unlockedChars[NUM_CHARS] = {false};
 int currentBiomeIdx = 0;
 int frames = 0;
 float currentSpeed = 3.2f;
+float worldScrollX = 0.0f; // נעצר לחלוטין כאשר המשחק לא ב-STATE_PLAYING!
 int shopPage = 0;
 int countdownVal = 3;
 static int countdownFrames = 0;
@@ -39,6 +46,115 @@ EnvParticle envParticles[25];
 static u16 topBuffer[SCREEN_W * SCREEN_H];
 static u16 bottomBuffer[SCREEN_W * SCREEN_H];
 
+// מבנה הנתונים שנשמר לתמיד בזיכרון הקונסולה/כרטיס
+typedef struct {
+    u32 magic;
+    int highScore;
+    int topScores[3];
+    int bestBiomeIdx;
+    int totalGamesPlayed;
+    int coinsCount;
+    int selectedCharIdx;
+    u8 unlocked[NUM_CHARS];
+} SaveFileData;
+
+// שמירה כפולה לתמיד: גם ל-SRAM של ה-DS וגם לקובץ שמירה בכרטיס!
+void savePermanentData(void) {
+    SaveFileData data;
+    data.magic = SAVE_MAGIC;
+    data.highScore = highScore;
+    data.topScores[0] = topScores[0];
+    data.topScores[1] = topScores[1];
+    data.topScores[2] = topScores[2];
+    data.bestBiomeIdx = bestBiomeIdx;
+    data.totalGamesPlayed = totalGamesPlayed;
+    data.coinsCount = coinsCount;
+    data.selectedCharIdx = selectedCharIdx;
+    for (int i = 0; i < NUM_CHARS; i++) {
+        data.unlocked[i] = unlockedChars[i] ? 1 : 0;
+    }
+
+    // 1. שמירה לזיכרון הגיבוי המובנה של ה-DS (SRAM)
+    sysSetCartOwner(BUS_OWNER_ARM9);
+    u8* sram = (u8*)SRAM;
+    const u8* src = (const u8*)&data;
+    for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
+        sram[i] = src[i];
+    }
+
+    // 2. שמירה לקובץ אם מערכת קבצים זמינה
+    FILE* fp = fopen("jumper_ds_save.sav", "wb");
+    if (fp) {
+        fwrite(&data, sizeof(SaveFileData), 1, fp);
+        fclose(fp);
+    }
+}
+
+// טעינת כל השיאים והנתונים שנשמרו לתמיד בעת הדלקת המשחק
+void loadPermanentData(void) {
+    SaveFileData data;
+    bool loaded = false;
+
+    // ניסיון ראשון: טעינה מקובץ שמירה
+    FILE* fp = fopen("jumper_ds_save.sav", "rb");
+    if (fp) {
+        if (fread(&data, sizeof(SaveFileData), 1, fp) == 1 && data.magic == SAVE_MAGIC) {
+            loaded = true;
+        }
+        fclose(fp);
+    }
+
+    // ניסיון שני: טעינה מ-SRAM של ה-DS
+    if (!loaded) {
+        sysSetCartOwner(BUS_OWNER_ARM9);
+        u8* sram = (u8*)SRAM;
+        u8* dst = (u8*)&data;
+        for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
+            dst[i] = sram[i];
+        }
+        if (data.magic == SAVE_MAGIC) {
+            loaded = true;
+        }
+    }
+
+    if (loaded) {
+        highScore = data.highScore;
+        topScores[0] = data.topScores[0];
+        topScores[1] = data.topScores[1];
+        topScores[2] = data.topScores[2];
+        bestBiomeIdx = (data.bestBiomeIdx >= 0 && data.bestBiomeIdx < NUM_BIOMES) ? data.bestBiomeIdx : 0;
+        totalGamesPlayed = (data.totalGamesPlayed >= 0) ? data.totalGamesPlayed : 0;
+        coinsCount = (data.coinsCount >= 0) ? data.coinsCount : 0;
+        selectedCharIdx = (data.selectedCharIdx >= 0 && data.selectedCharIdx < NUM_CHARS) ? data.selectedCharIdx : 0;
+        for (int i = 0; i < NUM_CHARS; i++) {
+            unlockedChars[i] = (data.unlocked[i] != 0);
+        }
+        unlockedChars[0] = true;
+    }
+}
+
+// עדכון טבלת 3 השיאים הגדולים ושמירה מידית לתמיד!
+static void recordNewScore(int finalSc, int biomeReached) {
+    totalGamesPlayed++;
+    if (biomeReached > bestBiomeIdx) {
+        bestBiomeIdx = biomeReached;
+    }
+    if (finalSc > highScore) {
+        highScore = finalSc;
+    }
+    if (finalSc > topScores[0]) {
+        topScores[2] = topScores[1];
+        topScores[1] = topScores[0];
+        topScores[0] = finalSc;
+    } else if (finalSc > topScores[1] && finalSc != topScores[0]) {
+        topScores[2] = topScores[1];
+        topScores[1] = finalSc;
+    } else if (finalSc > topScores[2] && finalSc != topScores[1] && finalSc != topScores[0]) {
+        topScores[2] = finalSc;
+    }
+    savePermanentData();
+}
+
 static void showBubble(const char* txt) {
     bubbleText = txt;
     bubbleTimer = 140;
@@ -49,6 +165,7 @@ static void resetGame(void) {
     frames = 0;
     currentBiomeIdx = 0;
     currentSpeed = 3.2f;
+    worldScrollX = 0.0f;
     player.x = 32.0f;
     player.y = GROUND_Y - 24;
     player.dy = 0.0f;
@@ -106,6 +223,10 @@ static void updateGamePhysics(void) {
     }
     if (newBiome != currentBiomeIdx) {
         currentBiomeIdx = newBiome;
+        if (currentBiomeIdx > bestBiomeIdx) {
+            bestBiomeIdx = currentBiomeIdx;
+            savePermanentData();
+        }
         showBubble(BIOMES[currentBiomeIdx].nameHeb);
     }
 
@@ -117,22 +238,29 @@ static void updateGamePhysics(void) {
         smoothGround[c] += ((float)targetB->ground[c] - smoothGround[c]) * 0.025f;
     }
 
-    currentSpeed = 3.2f + (dispScore * 0.004f);
-    if (currentSpeed > 7.0f) currentSpeed = 7.0f;
+    // האצה הדרגתית ומאתגרת ככל שמתקדמים בניקוד ובביומות (דורש אינסטינקט חד אך תמיד אפשרי!)
+    float speedBonus = (dispScore < 1500) ? (dispScore * 0.0011f) : (1.65f + (dispScore - 1500) * 0.00035f);
+    float biomeBoost = currentBiomeIdx * 0.04f;
+    currentSpeed = 3.2f + speedBonus + biomeBoost;
+    if (currentSpeed > 6.4f) currentSpeed = 6.4f; // תקרת מהירות מאתגרת אך הוגנת ואפשרית למעבר!
 
-    // פיזיקת קפיצה מותאמת לפי הדמות שנבחרה בחנות!
+    // קידום מרחק הקרקע אך ורק כשמשחקים בפועל!
+    worldScrollX += currentSpeed;
+
+    // פיזיקת קפיצה אדפטיבית: מתחדדת עם המהירות כדי שהנחיתה תהיה מהירה ומדויקת במהירויות גבוהות!
+    float speedRatio = currentSpeed / 3.2f; // נע בין 1.0 ל-2.0
     enum AnimStyle style = CHARACTERS[selectedCharIdx].style;
-    float grav = 0.45f;
-    float jumpForce = -7.8f;
+    float grav = 0.45f * (0.85f + 0.15f * speedRatio);
+    float jumpForce = -7.8f * (0.92f + 0.08f * speedRatio);
 
     if (style == STYLE_FLOAT) {
-        grav = 0.30f;      // חייזר / אסטרונאוט / מלאך מרחפים לאט באוויר!
-        jumpForce = -6.8f;
+        grav = 0.32f * (0.85f + 0.15f * speedRatio); // חייזר / אסטרונאוט / מלאך מרחפים אך נוחתים בזמן!
+        jumpForce = -6.9f * (0.92f + 0.08f * speedRatio);
     } else if (style == STYLE_HEAVY) {
-        grav = 0.58f;      // אביר / קינג קונג / גודזילה קופצים חזק ונוחתים כבד!
-        jumpForce = -8.8f;
+        grav = 0.58f * (0.85f + 0.15f * speedRatio); // אביר / קינג קונג / גודזילה קופצים חזק ונוחתים כבד!
+        jumpForce = -8.8f * (0.92f + 0.08f * speedRatio);
     } else if (style == STYLE_BOUNCE) {
-        jumpForce = -8.2f; // המבורגר / סליים / חיות קופצניות!
+        jumpForce = -8.2f * (0.92f + 0.08f * speedRatio); // המבורגר / סליים / חיות קופצניות!
     }
 
     if (player.jumpBuffer > 0) player.jumpBuffer--;
@@ -146,7 +274,7 @@ static void updateGamePhysics(void) {
         player.coyoteTimer = 0;
     }
 
-    // קיצור קפיצה אם עוזבים את הכפתור/מגע
+    // קיצור קפיצה אם עוזבים את הכפתור/מגע (מאפשר נחיתה מהירה ומדויקת בין מכשולים מהירים!)
     int held = keysHeld();
     if (!(held & (KEY_A | KEY_UP | KEY_B | KEY_TOUCH)) && player.dy < -3.0f) {
         player.dy = -3.0f;
@@ -178,16 +306,23 @@ static void updateGamePhysics(void) {
         }
     }
 
-    // יצירת מכשולים ומטבעות
-    int spawnInterval = (int)(180.0f / currentSpeed);
-    if (spawnInterval < 28) spawnInterval = 28;
+    // יצירת מכשולים עם מרווח בטיחות מובטח כדי שהמשחק תמיד יהיה אפשרי למעבר גם במהירות שיא!
+    float rightmostObsX = -100.0f;
+    for (int i = 0; i < 6; i++) {
+        if (obstacles[i].active && obstacles[i].x > rightmostObsX) {
+            rightmostObsX = obstacles[i].x;
+        }
+    }
 
-    if (frames % spawnInterval == 0) {
+    // מרחק מינימלי בין מכשולים שגדל יחד עם המהירות כך שתמיד יש זמן לנחות ולקפוץ שוב!
+    float minSafeGap = 86.0f + currentSpeed * 15.5f + (rand() % 28);
+
+    if (SCREEN_W - rightmostObsX >= minSafeGap) {
         for (int i = 0; i < 6; i++) {
             if (!obstacles[i].active) {
                 obstacles[i].active = true;
                 obstacles[i].hitAnimTimer = 0;
-                obstacles[i].x = SCREEN_W + 10;
+                obstacles[i].x = SCREEN_W + 10 + (rand() % 18);
                 bool isAir = (rand() % 10 >= 7);
                 obstacles[i].type = isAir ? BIOMES[currentBiomeIdx].airObs : BIOMES[currentBiomeIdx].groundObs;
                 obstacles[i].w = 24;
@@ -201,7 +336,7 @@ static void updateGamePhysics(void) {
             for (int i = 0; i < 6; i++) {
                 if (!coins[i].active) {
                     coins[i].active = true;
-                    coins[i].x = SCREEN_W + 35 + (rand() % 35);
+                    coins[i].x = SCREEN_W + 42 + (rand() % 35);
                     int r = rand() % 10;
                     if (r >= 9) {
                         coins[i].value = 20;
@@ -224,6 +359,7 @@ static void updateGamePhysics(void) {
 
     // בדיקה אם אויב או מכשול קרובים לשחקן (עבור הבעת הפנים המפוחדת במסך התחתון!)
     bool dangerNear = false;
+    float dangerRange = 65.0f + currentSpeed * 6.0f;
 
     // תנועת מכשולים ובדיקת התנגשות
     for (int i = 0; i < 6; i++) {
@@ -231,7 +367,7 @@ static void updateGamePhysics(void) {
             obstacles[i].x -= currentSpeed;
 
             float dist = obstacles[i].x - (player.x + player.w);
-            if (dist > -10.0f && dist < 78.0f) {
+            if (dist > -10.0f && dist < dangerRange) {
                 dangerNear = true;
             }
 
@@ -240,7 +376,7 @@ static void updateGamePhysics(void) {
                 player.x + player.w - pad > obstacles[i].x + pad &&
                 player.y + pad < obstacles[i].y + obstacles[i].h - pad &&
                 player.y + player.h - pad > obstacles[i].y + pad) {
-               
+              
                 lastDeathObs = obstacles[i].type;
                 obstacles[i].hitAnimTimer = 1; // מפעיל אנימציית תקיפה לאויב הפוגע!
                 deathAnimTimer = 1;
@@ -254,7 +390,8 @@ static void updateGamePhysics(void) {
                 currentFaceExpr = EXPR_HURT;
 
                 int finalSc = score / 10;
-                if (finalSc > highScore) highScore = finalSc;
+                recordNewScore(finalSc, currentBiomeIdx); // שמירת השיאים לתמיד!
+
                 // שליפת עקיצה מותאמת אישית ממאגר ה-C הענק!
                 currentRoastText = getRoastForDeath(lastDeathObs, finalSc, selectedCharIdx, currentBiomeIdx);
                 gameState = STATE_GAMEOVER;
@@ -274,6 +411,7 @@ static void updateGamePhysics(void) {
                 happyFaceTimer = 45; // הבעת פנים שמחה בדמות שבמסך התחתון!
                 if (coins[i].value == 20) showBubble("יהלום!");
                 coins[i].active = false;
+                savePermanentData(); // שמירה מידית של המטבעות לתמיד!
             } else if (coins[i].x < -20) {
                 coins[i].active = false;
             }
@@ -312,6 +450,7 @@ static void updateGamePhysics(void) {
 int main(void) {
     srand(time(NULL));
     unlockedChars[0] = true; // דמות ברירת מחדל פתוחה
+    loadPermanentData();     // טעינת כל השיאים והדמויות שנשמרו לתמיד!
 
     // אתחול שני המסכים של ה-DS במצב 16-bit Bitmap לחופש גרפי מקסימלי!
     videoSetMode(MODE_5_2D);
@@ -403,10 +542,12 @@ int main(void) {
                     if (tx >= bx && tx <= bx + 72 && ty >= by && ty <= by + 58) {
                         if (unlockedChars[cIdx]) {
                             selectedCharIdx = cIdx;
+                            savePermanentData(); // שמירת הדמות שנבחרה לתמיד!
                         } else if (coinsCount >= CHARACTERS[cIdx].price) {
                             coinsCount -= CHARACTERS[cIdx].price;
                             unlockedChars[cIdx] = true;
                             selectedCharIdx = cIdx;
+                            savePermanentData(); // שמירת הרכישה לתמיד!
                         }
                     }
                 }
@@ -417,7 +558,7 @@ int main(void) {
                     else if (tx >= 189 && tx <= 244 && (shopPage + 1) * 6 < NUM_CHARS) shopPage++;
                 }
             } else if (gameState == STATE_DETAILS) {
-                if (tx >= 68 && tx <= 188 && ty >= 142 && ty <= 174) {
+                if (tx >= 68 && tx <= 188 && ty >= 154 && ty <= 184) {
                     gameState = STATE_START;
                 }
             }
