@@ -44,7 +44,7 @@ enum CharAnimState {
 // הבעות פנים דינמיות ומשתנות לדמות במסך התחתון ובמשחק
 enum FaceExpr {
     EXPR_NORMAL = 0, // הבעה רגילה ריאליסטית (כולל מצמוץ טבעי)
-    EXPR_SCARED = 1, // הבעה מפוחדת כשמתקרבת מפלצת או מכשול
+    EXPR_SCARED = 1, // הבעה מפוחדת כשמתקרבת מפלצת או מכשול במסלול התנגשות
     EXPR_HAPPY  = 2, // הבעה שמחה באיסוף מטבע או יהלום
     EXPR_HURT   = 3  // הבעה כואבת/המומה בפגיעה ובפסילה
 };
@@ -174,8 +174,7 @@ extern int highScore;
 extern int topScores[3];       // 3 השיאים הגדולים שנשמרים לתמיד!
 extern int bestBiomeIdx;       // הביומה הכי רחוקה שהשחקן הגיע אליה אי פעם!
 extern int totalGamesPlayed;   // סך כל המשחקים ששוחקו!
-extern int coinsCount;         // כמות מטבעות נוכחית בחנות ובמשחק (נשמרת לתמיד!)
-extern int totalCoinsEarned;   // סך כל המטבעות שהורווחו אי פעם במשחק (נשמר לתמיד!)
+extern int coinsCount;
 extern int selectedCharIdx;
 extern bool unlockedChars[NUM_CHARS];
 extern int currentBiomeIdx;
@@ -187,6 +186,7 @@ extern int countdownVal;
 extern int bubbleTimer;
 extern const char* bubbleText;
 extern const char* currentRoastText;
+extern const char* currentWarningText; // הודעת האזהרה הספציפית לאויב במסך התחתון!
 extern enum ObsType lastDeathObs;
 
 // משתנים גלובליים ל-4 האנימציות, הבעות הפנים ומעבר הביומות ההדרגתי
@@ -201,7 +201,7 @@ extern float smoothGround[3];
 extern const BiomeData BIOMES[NUM_BIOMES];
 extern const CharData CHARACTERS[NUM_CHARS];
 
-// פונקציות שמירה וטעינה קבועה של כל השיאים, המטבעות והדמויות
+// פונקציות שמירה וטעינה קבועה של כל השיאים והדמויות
 void savePermanentData(void);
 void loadPermanentData(void);
 
@@ -215,9 +215,11 @@ void renderTopScreen(u16* buf);
 void drawCharacterSprite(u16* buf, int charIdx, int cx, int cy, int scalePct, bool isMoving, bool grounded, int angle, int frameCnt);
 void drawCharacterSpriteEx(u16* buf, int charIdx, int cx, int cy, int scalePct, enum CharAnimState animState, enum FaceExpr faceExpr, int angle, int frameCnt);
 const char* getRoastForDeath(enum ObsType obs, int finalScore, int charIdx, int biomeIdx);
+const char* getWarningForObstacle(enum ObsType obs);
 
 void renderBottomScreen(u16* buf);
 void drawHebrewString(u16* buf, int centerX, int y, const char* utf8Str, u16 color, int scale);
 void drawNumber(u16* buf, int x, int y, int num, u16 color, int scale);
 
 #endif
+ 
