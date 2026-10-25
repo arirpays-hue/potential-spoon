@@ -52,6 +52,25 @@ static const u8 numFont[10][8] = {
     {0x3C,0x42,0x42,0x3E,0x02,0x42,0x3C,0}  // 9
 };
 
+// אפקט טשטוש ופיקסליזציה אמיתי (Box-Blur + Dimming) לדמויות בחנות עד שמגיעים לרמה הנדרשת!
+static void blurRectArea(u16* buf, int x, int y, int w, int h) {
+    for (int py = y; py < y + h; py += 4) {
+        for (int px = x; px < x + w; px += 4) {
+            if (px < 0 || py < 0 || px + 3 >= SCREEN_W || py + 3 >= SCREEN_H) continue;
+            u16 c = buf[(py + 1) * SCREEN_W + (px + 1)];
+            int r = (c & 31) >> 1;
+            int g = ((c >> 5) & 31) >> 1;
+            int b = ((c >> 10) & 31) >> 1;
+            u16 blurred = 0x8000 | (b << 10) | (g << 5) | r;
+            for (int dy = 0; dy < 4; dy++) {
+                for (int dx = 0; dx < 4; dx++) {
+                    buf[(py + dy) * SCREEN_W + (px + dx)] = blurred;
+                }
+            }
+        }
+    }
+}
+
 static void drawGlyph8(u16* buf, int x, int y, const u8* rows, u16 color, int scale) {
     for (int r = 0; r < 8; r++) {
         u8 b = rows[r];
@@ -140,6 +159,11 @@ static void drawHebrewMultiline(u16* buf, int centerX, int y, const char* str, u
 }
 
 void renderBottomScreen(u16* buf) {
+    if (gameState == STATE_CUSTOMIZE || gameState == STATE_CUSTOM_KEYBOARD) {
+        renderCustomizerScreen(buf);
+        return;
+    }
+
     // רקע כהה מודרני למסך המגע
     for (int y = 0; y < SCREEN_H; y++) {
         u16 rowCol = C16(15, 22 + y / 12, 42 + y / 8);
@@ -152,25 +176,30 @@ void renderBottomScreen(u16* buf) {
     u16 green  = C16(46, 204, 113);
     u16 orange = C16(255, 107, 107);
     u16 blue   = C16(52, 152, 219);
+    u16 purple = C16(155, 89, 182);
 
     if (gameState == STATE_START) {
-        drawHebrewString(buf, 128, 18, "הרפתקאות הקופץ", yellow, 2);
-        drawHebrewString(buf, 128, 42, "עשרים ושבעה עולמות!", white, 1);
+        drawHebrewString(buf, 128, 12, "הרפתקאות הקופץ", yellow, 2);
+        drawHebrewString(buf, 128, 34, getActiveMissionDesc(), C16(120, 240, 250), 1);
 
         // כפתור שחק עכשיו
-        drawRect(buf, 48, 64, 160, 32, orange);
-        drawHebrewString(buf, 128, 72, "שחק עכשיו", white, 2);
+        drawRect(buf, 48, 52, 160, 30, orange);
+        drawHebrewString(buf, 128, 60, "שחק עכשיו", white, 2);
 
-        // כפתור חנות הדמויות (99 דמויות)
-        drawRect(buf, 48, 106, 160, 32, yellow);
-        drawHebrewString(buf, 128, 114, "חנות הדמויות", C16(25, 25, 25), 2);
+        // כפתור חנות הדמויות
+        drawRect(buf, 48, 88, 160, 30, yellow);
+        drawHebrewString(buf, 128, 96, "חנות הדמויות", C16(25, 25, 25), 2);
+
+        // כפתור הרכבה אישית מטורפת
+        drawRect(buf, 48, 124, 160, 28, purple);
+        drawHebrewString(buf, 128, 134, "הרכבה אישית!", white, 1);
 
         // כפתור פרטים ושיא
-        drawRect(buf, 68, 148, 120, 26, blue);
-        drawHebrewString(buf, 128, 157, "פרטים ושיא", white, 1);
+        drawRect(buf, 68, 158, 120, 26, blue);
+        drawHebrewString(buf, 128, 167, "פרטים ושיא", white, 1);
 
     } else if (gameState == STATE_PLAYING || gameState == STATE_PAUSED || gameState == STATE_COUNTDOWN) {
-        drawHebrewString(buf, 128, 14, "גע במסך או לחץ לקפיצה!", yellow, 1);
+        drawHebrewString(buf, 128, 10, getActiveMissionDesc(), yellow, 1);
 
         // הילה דינמית שמשנה צבע כשמזוהה מסלול התנגשות עם אויב או באיסוף מטבע!
         u16 ringCol = C16(30, 45, 70);
@@ -179,7 +208,8 @@ void renderBottomScreen(u16* buf) {
 
         drawCircle(buf, 128, 70, 30, ringCol);
         drawCharacterSpriteEx(buf, selectedCharIdx, 128, 72, 120, playerAnimState, currentFaceExpr, 0, frames);
-        drawHebrewString(buf, 128, 106, CHARACTERS[selectedCharIdx].nameHeb, green, 1);
+        const char* activeName = (selectedCharIdx == CUSTOM_CHAR_IDX) ? customChar.nameHeb : CHARACTERS[selectedCharIdx].nameHeb;
+        drawHebrewString(buf, 128, 106, activeName, green, 1);
 
         // הצגת הודעת האזהרה הספציפית לאויב (רק כשיש סכנת התנגשות אמיתית!)
         if (currentFaceExpr == EXPR_SCARED && currentWarningText != NULL) {
@@ -219,11 +249,11 @@ void renderBottomScreen(u16* buf) {
         drawCircle(buf, 22, 10, 5, yellow);
         drawNumber(buf, 32, 6, coinsCount, yellow, 1);
 
-        // רשת של 6 דמויות בעמוד (3x2) עם ציור מעוגל ומפורט של כל דמות!
+        // רשת של 6 דמויות בעמוד (כולל הדמות בהרכבה אישית וטשטוש לדמויות נעולות לפי רמה!)
         int startIdx = shopPage * 6;
         for (int i = 0; i < 6; i++) {
             int cIdx = startIdx + i;
-            if (cIdx >= NUM_CHARS) break;
+            if (cIdx >= TOTAL_SHOP_CHARS) break;
 
             int col = i % 3;
             int row = i / 3;
@@ -232,25 +262,34 @@ void renderBottomScreen(u16* buf) {
 
             bool owned = unlockedChars[cIdx];
             bool sel   = (selectedCharIdx == cIdx);
+            int reqBiome = getRequiredBiomeForChar(cIdx);
+            bool isBlurred = (bestBiomeIdx < reqBiome);
 
             u16 cardCol = sel ? C16(30, 90, 55) : (owned ? C16(35, 50, 80) : C16(25, 30, 45));
             drawRect(buf, bx, by, 72, 58, cardCol);
             if (sel) drawRect(buf, bx, by, 72, 3, green);
 
-            // הדמות הנבחרת מחייכת בחנות, ושאר הדמויות מציגות את אנימציית ההליכה והמצמוץ שלהן!
             enum FaceExpr shopExpr = sel ? EXPR_HAPPY : EXPR_NORMAL;
             drawCharacterSpriteEx(buf, cIdx, bx + 36, by + 22, 100, CHAR_ANIM_WALK, shopExpr, 0, frames);
 
-            // שם הדמות בעברית
-            drawHebrewString(buf, bx + 36, by + 37, CHARACTERS[cIdx].nameHeb, white, 1);
-
-            // מחיר או סטטוס
-            if (sel) {
-                drawHebrewString(buf, bx + 36, by + 48, "נבחר", green, 1);
-            } else if (owned) {
-                drawHebrewString(buf, bx + 36, by + 48, "בחר", blue, 1);
+            if (isBlurred) {
+                // הפעלת טשטוש על הדמות עד שהשחקן מגיע לרמה/ביומה הנדרשת!
+                blurRectArea(buf, bx + 8, by + 2, 56, 34);
+                drawHebrewString(buf, bx + 36, by + 37, "מטושטש!", orange, 1);
+                drawHebrewString(buf, bx + 46, by + 48, "רמה:", yellow, 1);
+                drawNumber(buf, bx + 12, by + 48, reqBiome + 1, yellow, 1);
+            } else if (cIdx == CUSTOM_CHAR_IDX) {
+                drawHebrewString(buf, bx + 36, by + 37, customChar.nameHeb, yellow, 1);
+                drawHebrewString(buf, bx + 36, by + 48, sel ? "נבחר" : (customChar.created ? "בחר" : "הרכב!"), green, 1);
             } else {
-                drawNumber(buf, bx + 22, by + 48, CHARACTERS[cIdx].price, yellow, 1);
+                drawHebrewString(buf, bx + 36, by + 37, CHARACTERS[cIdx].nameHeb, white, 1);
+                if (sel) {
+                    drawHebrewString(buf, bx + 36, by + 48, "נבחר", green, 1);
+                } else if (owned) {
+                    drawHebrewString(buf, bx + 36, by + 48, "בחר", blue, 1);
+                } else {
+                    drawNumber(buf, bx + 22, by + 48, CHARACTERS[cIdx].price, yellow, 1);
+                }
             }
         }
 
