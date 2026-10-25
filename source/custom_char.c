@@ -289,7 +289,7 @@ void drawCustomCharacterSprite(u16* buf, int cx, int cy, int scalePct, enum Char
 
     // אם יש תסרוקת שיער ארוכה/אפרו מאחורי הראש (כשללא כובע או מציץ)
     if (hatSt == 0 && hairSt > 0 && (hairSt % 6 == 4)) {
-        drawCircle(buf, hx, hy - 2 * s, 10 * s, hairCol); // רעמת אפרו עגולה!
+        drawCircle(buf, hx, hy - 2 * s, 10 * s, hairCol);
     }
 
     if (faceSt == 199) {
@@ -345,9 +345,8 @@ void drawCustomCharacterSprite(u16* buf, int cx, int cy, int scalePct, enum Char
     }
 
     // 7. גבות וקמירות הגבות (קטגוריות 8 ו-9!)
-    // חישוב קמירות/זווית הגבות לפי קטגוריה 9 (0=ישר, 1=קמור שמח, 2=זועם פנימה, 3=מודאג החוצה, 4=גבה אחת מורמת!)
     int browCurve = curveSt % 5;
-    int b thick = (browSt % 3 == 2) ? (2 * s) : (1 * s);
+    int bthick = (browSt % 3 == 2) ? (2 * s) : (1 * s);
     int byL_out = hy - 4 * s, byL_in = hy - 4 * s;
     int byR_in  = hy - 4 * s, byR_out = hy - 4 * s;
 
