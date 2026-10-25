@@ -43,7 +43,7 @@ enum CharAnimState {
 
 // הבעות פנים דינמיות ומשתנות לדמות במסך התחתון ובמשחק
 enum FaceExpr {
-    EXPR_NORMAL = 0, // הבעה רגילה
+    EXPR_NORMAL = 0, // הבעה רגילה ריאליסטית (כולל מצמוץ טבעי)
     EXPR_SCARED = 1, // הבעה מפוחדת כשמתקרבת מפלצת או מכשול
     EXPR_HAPPY  = 2, // הבעה שמחה באיסוף מטבע או יהלום
     EXPR_HURT   = 3  // הבעה כואבת/המומה בפגיעה ובפסילה
@@ -171,12 +171,16 @@ extern enum GameState gameState;
 extern Player player;
 extern int score;
 extern int highScore;
+extern int topScores[3];       // 3 השיאים הגדולים שנשמרים לתמיד!
+extern int bestBiomeIdx;       // הביומה הכי רחוקה שהשחקן הגיע אליה אי פעם!
+extern int totalGamesPlayed;   // סך כל המשחקים ששוחקו!
 extern int coinsCount;
 extern int selectedCharIdx;
 extern bool unlockedChars[NUM_CHARS];
 extern int currentBiomeIdx;
 extern int frames;
 extern float currentSpeed;
+extern float worldScrollX;     // מרחק גלילת הקרקע (נעצר לחלוטין בעצירה ובתפריט!)
 extern int shopPage;
 extern int countdownVal;
 extern int bubbleTimer;
@@ -195,6 +199,10 @@ extern float smoothGround[3];
 
 extern const BiomeData BIOMES[NUM_BIOMES];
 extern const CharData CHARACTERS[NUM_CHARS];
+
+// פונקציות שמירה וטעינה קבועה של כל השיאים והדמויות
+void savePermanentData(void);
+void loadPermanentData(void);
 
 // פונקציות עזר וציור
 u16 rgb8To16(int r, int g, int b);
