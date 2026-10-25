@@ -32,16 +32,6 @@ static const char* CAT_NAMES[CUSTOM_PARTS_COUNT] = {
     "גלימה וכנפיים"   // 13
 };
 
-// משימות זמניות למשחק אחד שמעניקות חלקי הרכבה אגדיים!
-static const char* MISSION_DESCS[6] = {
-    "משימה: הגע לממתקים לראש עוגיה!",
-    "משימה: הגע למדבר לכובע פרעה!",
-    "משימה: הגע להר געש לשריון לבה!",
-    "משימה: הגע לחלל לקסדת חלל!",
-    "משימה: צבור 500 נק׳ לזקן קוסם!",
-    "משימה: שבור שיא לנעלי סילון!"
-};
-
 // טבלת UTF-8 לאותיות עבריות (1..27) עבור המקלדת
 static const unsigned char HEB_UTF8_MAP[28][2] = {
     {0, 0},
@@ -109,6 +99,7 @@ static void syncGlyphsToUtf8Name(void) {
 }
 
 void initDefaultCustomChar(void) {
+    initCustomPartsDatabase();
     if (customChar.nameHeb[0] == '\0') {
         strcpy(customChar.nameHeb, "אישי");
         customChar.partStyle[0]  = 0; customChar.partColor[0]  = 0;  // 0: פנים
@@ -130,52 +121,21 @@ void initDefaultCustomChar(void) {
 }
 
 const char* getActiveMissionDesc(void) {
-    return MISSION_DESCS[currentMissionId % 6];
+    return getProceduralMissionText();
 }
 
 void pickNewTempMission(void) {
-    currentMissionId = rand() % 6;
-    currentMissionDone = false;
+    currentMissionId++;
+    generateProceduralMission();
 }
 
 void checkMissionAndRecordUnlocks(int dispScore, int biomeIdx, bool brokeRecord) {
-    if (!currentMissionDone) {
-        bool completed = false;
-        if (currentMissionId == 0 && biomeIdx >= 3) completed = true; // הגעה לממתקים -> ראש עוגייה!
-        if (currentMissionId == 1 && biomeIdx >= 1) completed = true; // הגעה למדבר -> כובע פרעה!
-        if (currentMissionId == 2 && biomeIdx >= 4) completed = true; // הגעה להר געש -> שריון לבה!
-        if (currentMissionId == 3 && biomeIdx >= 5) completed = true; // הגעה לחלל -> קסדת חלל!
-        if (currentMissionId == 4 && dispScore >= 500) completed = true; // 500 נקודות -> זקן קוסם!
-        if (currentMissionId == 5 && brokeRecord && dispScore >= 100) completed = true; // שבירת שיא -> נעלי סילון!
-
-        if (completed) {
-            currentMissionDone = true;
-            unlockedCustomRewards |= (1 << currentMissionId);
-            if (currentMissionId == 0) {
-                customChar.partStyle[0] = 199;
-                customChar.partColor[0] = 1;
-                bubbleText = "נפתח ראש איש עוגיה!";
-            } else {
-                bubbleText = "משימה הושלמה! פרס נפתח!";
-            }
-            bubbleTimer = 160;
-            savePermanentData();
-        }
-    }
-
-    if (brokeRecord && dispScore >= 150) {
-        unlockedCustomRewards |= (1 << 6);
-        savePermanentData();
-    }
+    notifyProceduralMissionEvent(dispScore, biomeIdx, 0, 0, brokeRecord);
 }
 
-// ציור הדמות בהרכבה אישית בתמיכה מלאה בכל סקאלה (100%=רגיל, 200%=בינוני, 300%=תקריב זום אוטומטי לפנים ולקמירות!)
+// ציור הדמות בהרכבה אישית ישירות מתוך מאגר 2,800 האלמנטים הייחודיים (custom_parts_db.c)!
 void drawCustomCharacterSprite(u16* buf, int cx, int cy, int scalePct, enum CharAnimState animState, enum FaceExpr faceExpr, int frameCnt) {
     int s = (scalePct >= 250) ? 3 : ((scalePct >= 120) ? 2 : 1);
-    u16 black = C16(18, 18, 24);
-    u16 white = C16(252, 252, 255);
-    u16 gold  = C16(255, 215, 0);
-    u16 red   = C16(235, 40, 40);
 
     bool isMoving = (gameState == STATE_PLAYING || gameState == STATE_SHOP || (gameState == STATE_CUSTOMIZE && s <= 2));
     int phase = isMoving ? ((frameCnt / 3) % 4) : 0;
@@ -185,315 +145,32 @@ void drawCustomCharacterSprite(u16* buf, int cx, int cy, int scalePct, enum Char
     if (animState == CHAR_ANIM_JUMP) { bobY = -3; legL = -4; legR = 4; }
     else if (animState == CHAR_ANIM_HIT_GROUND || animState == CHAR_ANIM_HIT_AIR) { bobY = 2; faceExpr = EXPR_HURT; }
 
-    int x = cx;
-    int y = cy + bobY * s;
-
-    u16 faceCol  = getCustomPaletteColor(customChar.partColor[0]);
-    u16 beardCol = getCustomPaletteColor(customChar.partColor[1]);
-    u16 eyeCol   = getCustomPaletteColor(customChar.partColor[2]);
-    u16 bodyCol  = getCustomPaletteColor(customChar.partColor[3]);
-    u16 handCol  = getCustomPaletteColor(customChar.partColor[4]);
-    u16 legCol   = getCustomPaletteColor(customChar.partColor[5]);
-    u16 shoeCol  = getCustomPaletteColor(customChar.partColor[6]);
-    u16 hatCol   = getCustomPaletteColor(customChar.partColor[7]);
-    u16 browCol  = getCustomPaletteColor(customChar.partColor[8]);
-    u16 noseCol  = getCustomPaletteColor(customChar.partColor[10]);
-    u16 mouthCol = getCustomPaletteColor(customChar.partColor[11]);
-    u16 hairCol  = getCustomPaletteColor(customChar.partColor[12]);
-    u16 backCol  = getCustomPaletteColor(customChar.partColor[13]);
-
-    int faceSt  = customChar.partStyle[0];
-    int beardSt = customChar.partStyle[1];
-    int eyeSt   = customChar.partStyle[2];
-    int bodySt  = customChar.partStyle[3];
-    int handSt  = customChar.partStyle[4];
-    int legSt   = customChar.partStyle[5];
-    int shoeSt  = customChar.partStyle[6];
-    int hatSt   = customChar.partStyle[7];
-    int browSt  = customChar.partStyle[8];
-    int curveSt = customChar.partStyle[9];  // קמירות גבות ופה!
-    int noseSt  = customChar.partStyle[10]; // אפים!
-    int mouthSt = customChar.partStyle[11]; // פיות!
-    int hairSt  = customChar.partStyle[12]; // שיער ותסרוקת!
-    int backSt  = customChar.partStyle[13]; // גלימה/כנפיים/אביזר גב!
-
-    // 0. גלימות, כנפיים ואביזרי גב מותאמים אישית (קטגוריה 13)
-    if (backSt > 0 || bodySt % 5 == 4) {
-        int bMode = (backSt > 0) ? (backSt % 4) : 1;
-        if (bMode == 1) { // גלימת מלכות/גיבור
-            drawRect(buf, x - 11 * s, y - 5 * s, 22 * s, 16 * s, backCol);
-        } else if (bMode == 2) { // כנפי מלאך/דרקון פרוסות!
-            drawCircle(buf, x - 12 * s, y - 3 * s, 6 * s, backCol);
-            drawCircle(buf, x + 12 * s, y - 3 * s, 6 * s, backCol);
-        } else if (bMode == 3) { // תרמיל סילון (Jetpack)
-            drawRect(buf, x - 9 * s, y - 4 * s, 18 * s, 9 * s, C16(160, 170, 185));
-            drawCircle(buf, x - 8 * s, y + 6 * s, 2 * s, gold);
-            drawCircle(buf, x + 8 * s, y + 6 * s, 2 * s, gold);
-        }
-    }
-
-    // 1. רגליים מותאמות אישית
-    int legW = (legSt % 3 == 0) ? 6 : 5;
-    drawRect(buf, x - (6 - legL / 2) * s, y + 5 * s, legW * s, 7 * s, black);
-    drawRect(buf, x - (5 - legL / 2) * s, y + 5 * s, (legW - 2) * s, 6 * s, legCol);
-    drawRect(buf, x + (1 + legR / 2) * s, y + 5 * s, legW * s, 7 * s, black);
-    drawRect(buf, x + (2 + legR / 2) * s, y + 5 * s, (legW - 2) * s, 6 * s, legCol);
-    if (legSt % 2 == 1) {
-        drawRect(buf, x - (5 - legL / 2) * s, y + 8 * s, (legW - 2) * s, 1 * s, white);
-        drawRect(buf, x + (2 + legR / 2) * s, y + 8 * s, (legW - 2) * s, 1 * s, white);
-    }
-
-    // 2. נעליים מותאמות אישית
-    int shoeW = 6 + (shoeSt % 3);
-    drawRect(buf, x - (7 - legL / 2) * s, y + 11 * s, shoeW * s, 4 * s, black);
-    drawRect(buf, x - (6 - legL / 2) * s, y + 12 * s, (shoeW - 2) * s, 2 * s, shoeCol);
-    drawRect(buf, x + (1 + legR / 2) * s, y + 11 * s, shoeW * s, 4 * s, black);
-    drawRect(buf, x + (2 + legR / 2) * s, y + 12 * s, (shoeW - 2) * s, 2 * s, shoeCol);
-    if (shoeSt % 4 == 3) {
-        drawRect(buf, x - (6 - legL / 2) * s, y + 15 * s, 3 * s, 2 * s, gold);
-        drawRect(buf, x + (2 + legR / 2) * s, y + 15 * s, 3 * s, 2 * s, red);
-    }
-
-    // 3. גוף ושריון מותאמים אישית
-    drawRect(buf, x - 7 * s, y - 4 * s, 14 * s, 10 * s, black);
-    drawRect(buf, x - 6 * s, y - 3 * s, 12 * s, 8 * s, bodyCol);
-    if (bodySt % 3 == 1) {
-        drawRect(buf, x - 6 * s, y + 2 * s, 12 * s, 2 * s, gold);
-    } else if (bodySt % 3 == 2) {
-        drawCircle(buf, x, y, 3 * s, white);
-    }
-    if (bodySt >= 100) {
-        drawCircle(buf, x - 7 * s, y - 3 * s, 3 * s, gold);
-        drawCircle(buf, x + 7 * s, y - 3 * s, 3 * s, gold);
-    }
-
-    // 4. ידיים ונשקים
-    drawRect(buf, x - 11 * s, y - 3 * s, 4 * s, 7 * s, black);
-    drawRect(buf, x - 10 * s, y - 2 * s, 2 * s, 5 * s, bodyCol);
-    drawRect(buf, x + 7 * s,  y - 3 * s, 4 * s, 7 * s, black);
-    drawRect(buf, x + 8 * s,  y - 2 * s, 2 * s, 5 * s, bodyCol);
-    drawCircle(buf, x - 9 * s, y + 4 * s, 2 * s, handCol);
-    drawCircle(buf, x + 9 * s, y + 4 * s, 2 * s, handCol);
-    if (handSt % 4 == 1) {
-        drawLine(buf, x + 9 * s, y + 3 * s, x + 15 * s, y - 10 * s, C16(0, 255, 255));
-    } else if (handSt % 4 == 2) {
-        drawCircle(buf, x - 11 * s, y + 2 * s, 4 * s, gold);
-    } else if (handSt % 4 == 3) {
-        drawLine(buf, x + 11 * s, y + 10 * s, x + 11 * s, y - 12 * s, gold);
-        drawCircle(buf, x + 11 * s, y - 13 * s, 3 * s, red);
-    }
-
-    // 5. פנים וראש
+    int x  = cx;
+    int y  = cy + bobY * s;
     int hx = x;
     int hy = y - 10 * s;
 
-    // אם יש תסרוקת שיער ארוכה/אפרו מאחורי הראש (כשללא כובע או מציץ)
-    if (hatSt == 0 && hairSt > 0 && (hairSt % 6 == 4)) {
-        drawCircle(buf, hx, hy - 2 * s, 10 * s, hairCol);
-    }
-
-    if (faceSt == 199) {
-        // ראש איש עוגייה (Gingerbread Cookie Head)
-        drawCircle(buf, hx, hy, 9 * s, C16(90, 45, 15));
-        drawCircle(buf, hx, hy, 8 * s, C16(195, 125, 60));
-        drawCircle(buf, hx - 5 * s, hy - 5 * s, 2 * s, white);
-        drawCircle(buf, hx,         hy - 6 * s, 2 * s, C16(255, 105, 180));
-        drawCircle(buf, hx + 5 * s, hy - 5 * s, 2 * s, white);
-    } else {
-        int headR = 7 + (faceSt % 2);
-        drawCircle(buf, hx, hy, (headR + 1) * s, black);
-        drawCircle(buf, hx, hy, headR * s, faceCol);
-        if (faceSt % 5 == 2) { // אוזני אלף/חיה
-            drawCircle(buf, hx - 8 * s, hy - 1 * s, 2 * s, faceCol);
-            drawCircle(buf, hx + 8 * s, hy - 1 * s, 2 * s, faceCol);
-        } else if (faceSt % 5 == 4) { // צלקת קרב על הלחי
-            drawLine(buf, hx - 5 * s, hy - 3 * s, hx - 4 * s, hy + 2 * s, red);
-        }
-    }
-
-    // 6. עיניים ומשקפיים
-    if (faceExpr == EXPR_SCARED) {
-        drawRect(buf, hx - 5 * s, hy - 2 * s, 4 * s, 4 * s, white);
-        drawRect(buf, hx + 2 * s, hy - 2 * s, 4 * s, 4 * s, white);
-        drawRect(buf, hx - 4 * s, hy - 1 * s, 2 * s, 2 * s, black);
-        drawRect(buf, hx + 3 * s, hy - 1 * s, 2 * s, 2 * s, black);
-    } else if (faceExpr == EXPR_HURT) {
-        drawLine(buf, hx - 5 * s, hy - 2 * s, hx - 2 * s, hy + 1 * s, black);
-        drawLine(buf, hx - 2 * s, hy - 2 * s, hx - 5 * s, hy + 1 * s, black);
-        drawLine(buf, hx + 2 * s, hy - 2 * s, hx + 5 * s, hy + 1 * s, black);
-        drawLine(buf, hx + 5 * s, hy - 2 * s, hx + 2 * s, hy + 1 * s, black);
-    } else {
-        if (eyeSt % 5 == 1) { // משקפי שמש / סייבר
-            drawRect(buf, hx - 6 * s, hy - 2 * s, 12 * s, 3 * s, eyeCol);
-            drawRect(buf, hx - 6 * s, hy - 3 * s, 12 * s, 1 * s, black);
-        } else if (eyeSt % 5 == 2) { // עין קיקלופ ענקית
-            drawCircle(buf, hx, hy - 1 * s, 3 * s, white);
-            drawCircle(buf, hx, hy - 1 * s, 1 * s, eyeCol);
-        } else if (eyeSt % 5 == 3) { // עיניים מנצנצות עם ריסים ארוכים
-            drawRect(buf, hx - 5 * s, hy - 2 * s, 3 * s, 3 * s, white);
-            drawRect(buf, hx + 2 * s, hy - 2 * s, 3 * s, 3 * s, white);
-            drawRect(buf, hx - 4 * s, hy - 1 * s, 2 * s, 2 * s, eyeCol);
-            drawRect(buf, hx + 3 * s, hy - 1 * s, 2 * s, 2 * s, eyeCol);
-            drawRect(buf, hx - 5 * s, hy - 2 * s, 1 * s, 1 * s, white);
-            drawRect(buf, hx + 2 * s, hy - 2 * s, 1 * s, 1 * s, white);
+    // סדר ציור השכבות מתוך מסד 200 הפריטים הייחודיים לכל קטגוריה:
+    // 1. גלימה/כנפיים מאחור -> 2. רגליים -> 3. נעליים -> 4. גוף -> 5. ידיים -> 6. פנים -> 7. עיניים -> 8. גבות -> 9. אף -> 10. פה -> 11. זקן -> 12. שיער/כובע
+    const int drawOrder[12] = {13, 5, 6, 3, 4, 0, 2, 8, 10, 11, 1, 7};
+    for (int step = 0; step < 12; step++) {
+        int cat = drawOrder[step];
+        if (cat == 7 && customChar.partStyle[7] == 0) {
+            // אם אין כובע, מציירים את תסרוקת השיער הייחודית (קטגוריה 12)!
+            u16 hairCol = getCustomPaletteColor(customChar.partColor[12]);
+            renderStoredCustomPart(buf, 12, customChar.partStyle[12], hairCol, hx, hy, x, y, s, legL, legR, faceExpr);
         } else {
-            drawRect(buf, hx - 5 * s, hy - 2 * s, 3 * s, 3 * s, white);
-            drawRect(buf, hx + 2 * s, hy - 2 * s, 3 * s, 3 * s, white);
-            drawRect(buf, hx - 4 * s, hy - 1 * s, 2 * s, 2 * s, eyeCol);
-            drawRect(buf, hx + 3 * s, hy - 1 * s, 2 * s, 2 * s, eyeCol);
-        }
-    }
-
-    // 7. גבות וקמירות הגבות (קטגוריות 8 ו-9!)
-    int browCurve = curveSt % 5;
-    int bthick = (browSt % 3 == 2) ? (2 * s) : (1 * s);
-    int byL_out = hy - 4 * s, byL_in = hy - 4 * s;
-    int byR_in  = hy - 4 * s, byR_out = hy - 4 * s;
-
-    if (browCurve == 1)      { byL_out += s; byR_out += s; } // גבות קמורות שמחות
-    else if (browCurve == 2) { byL_in  += s; byR_in  += s; byL_out -= s; byR_out -= s; } // גבות זועמות אלכסוניות
-    else if (browCurve == 3) { byL_out += s; byR_out += s; byL_in  -= s; byR_in  -= s; } // גבות עצובות/מופתעות
-    else if (browCurve == 4) { byL_out -= s; byL_in  -= s; byR_in  += s; }               // גבה אחת מורמת בסטייל!
-
-    if (browSt % 4 == 3) { // חד-גבה מחוברת!
-        drawLine(buf, hx - 6 * s, byL_out, hx, byL_in, browCol);
-        drawLine(buf, hx, byR_in, hx + 6 * s, byR_out, browCol);
-    } else {
-        drawLine(buf, hx - 6 * s, byL_out, hx - 2 * s, byL_in, browCol);
-        drawLine(buf, hx + 2 * s, byR_in,  hx + 6 * s, byR_out, browCol);
-        if (bthick > s) {
-            drawLine(buf, hx - 6 * s, byL_out - 1, hx - 2 * s, byL_in - 1, browCol);
-            drawLine(buf, hx + 2 * s, byR_in - 1,  hx + 6 * s, byR_out - 1, browCol);
-        }
-    }
-
-    // 8. אפים מותאמים אישית (קטגוריה 10: קטן, כפתור, ליצן עגול, מחודד, רחב, משולש!)
-    int nMode = noseSt % 6;
-    if (nMode == 1) { // אף כפתור חמוד
-        drawRect(buf, hx - 1 * s, hy, 2 * s, 2 * s, noseCol);
-    } else if (nMode == 2) { // אף ליצן עגול ובולט!
-        drawCircle(buf, hx, hy + 1 * s, 2 * s, noseCol);
-    } else if (nMode == 3) { // אף ארוך/מחודד
-        drawLine(buf, hx, hy - 1 * s, hx + 2 * s, hy + 2 * s, noseCol);
-    } else if (nMode == 4) { // אף רחב
-        drawRect(buf, hx - 2 * s, hy + 1 * s, 4 * s, 2 * s, noseCol);
-    } else if (nMode == 5) { // חוטם חיה משולש
-        drawRect(buf, hx - 2 * s, hy, 4 * s, 2 * s, white);
-        drawRect(buf, hx - 1 * s, hy, 2 * s, 1 * s, noseCol);
-    }
-
-    // 9. פיות, חיוכים וקמירות הפה (קטגוריות 11 ו-9!)
-    int mMode = mouthSt % 7;
-    int mouthCurve = (curveSt / 5) % 3; // 0=חיוך למעלה, 1=ישר, 2=קמור למטה
-    int my = hy + 4 * s;
-
-    if (faceExpr == EXPR_SCARED) {
-        drawCircle(buf, hx, my, 2 * s, black);
-        drawCircle(buf, hx, my, 1 * s, red);
-    } else if (mMode == 0) { // חיוך מותאם לפי הקמירות!
-        drawRect(buf, hx - 3 * s, my, 6 * s, 1 * s, mouthCol);
-        if (mouthCurve == 0) { // פינות חיוך עולות למעלה
-            drawRect(buf, hx - 4 * s, my - 1 * s, 1 * s, 1 * s, mouthCol);
-            drawRect(buf, hx + 3 * s, my - 1 * s, 1 * s, 1 * s, mouthCol);
-        } else if (mouthCurve == 2) { // פינות פה יורדות למטה
-            drawRect(buf, hx - 4 * s, my + 1 * s, 1 * s, 1 * s, mouthCol);
-            drawRect(buf, hx + 3 * s, my + 1 * s, 1 * s, 1 * s, mouthCol);
-        }
-    } else if (mMode == 1) { // חיוך רחב עם שיניים לבנות בולטות!
-        drawRect(buf, hx - 4 * s, my - 1 * s, 8 * s, 3 * s, black);
-        drawRect(buf, hx - 3 * s, my - 1 * s, 6 * s, 1 * s, white);
-        drawRect(buf, hx - 2 * s, my + 1 * s, 4 * s, 1 * s, mouthCol);
-    } else if (mMode == 2) { // פה עם ניבים של ערפד/מפלצת!
-        drawRect(buf, hx - 4 * s, my, 8 * s, 2 * s, mouthCol);
-        drawRect(buf, hx - 3 * s, my + 1 * s, 1 * s, 2 * s, white);
-        drawRect(buf, hx + 2 * s, my + 1 * s, 1 * s, 2 * s, white);
-    } else if (mMode == 3) { // פה שורק / מופתע עגול ('O')
-        drawCircle(buf, hx, my, 2 * s, black);
-        drawCircle(buf, hx, my, 1 * s, mouthCol);
-    } else if (mMode == 4) { // פה עם לשון בחוץ!
-        drawRect(buf, hx - 3 * s, my, 6 * s, 1 * s, black);
-        drawRect(buf, hx - 1 * s, my + 1 * s, 3 * s, 2 * s, C16(255, 100, 140));
-    } else if (mMode == 5) { // חיוך חתולי גלי (:3)
-        drawLine(buf, hx - 3 * s, my, hx, my + 1 * s, mouthCol);
-        drawLine(buf, hx, my + 1 * s, hx + 3 * s, my, mouthCol);
-    } else { // חיוך צדדי מתוחכם (Smirk)
-        drawLine(buf, hx - 3 * s, my + 1 * s, hx + 3 * s, my - 1 * s, mouthCol);
-    }
-
-    // 10. זקן ושפם (קטגוריה 1)
-    if (beardSt > 0) {
-        int bType = beardSt % 4;
-        if (bType == 1) { // שפם אצילי
-            drawRect(buf, hx - 5 * s, hy + 2 * s, 10 * s, 2 * s, beardCol);
-        } else if (bType == 2) { // זקן צרפתי
-            drawRect(buf, hx - 3 * s, hy + 5 * s, 6 * s, 3 * s, beardCol);
-        } else if (bType == 3) { // זקן קוסם ענק
-            drawCircle(buf, hx, hy + 6 * s, 5 * s, beardCol);
-            drawCircle(buf, hx, hy + 10 * s, 3 * s, beardCol);
-        } else { // זקן מלא
-            drawRect(buf, hx - 6 * s, hy + 3 * s, 12 * s, 5 * s, beardCol);
-        }
-    }
-
-    // 11. שיער ותסרוקות במידה שאין כובע (קטגוריה 12!) או כובעים (קטגוריה 7)
-    if (hatSt == 0) {
-        if (hairSt > 0) {
-            int hrMode = hairSt % 6;
-            if (hrMode == 1) { // קוצים בסגנון אנימה / סופר-סאייה!
-                drawRect(buf, hx - 7 * s, hy - 9 * s, 14 * s, 3 * s, hairCol);
-                drawCircle(buf, hx - 5 * s, hy - 11 * s, 2 * s, hairCol);
-                drawCircle(buf, hx,         hy - 12 * s, 3 * s, hairCol);
-                drawCircle(buf, hx + 5 * s, hy - 11 * s, 2 * s, hairCol);
-            } else if (hrMode == 2) { // מוהוק פאנק גבוה במרכז הראש!
-                drawRect(buf, hx - 2 * s, hy - 14 * s, 4 * s, 7 * s, hairCol);
-                drawRect(buf, hx - 1 * s, hy - 15 * s, 2 * s, 2 * s, gold);
-            } else if (hrMode == 3) { // שיער גולש ארוך בצדדים + פוני!
-                drawRect(buf, hx - 8 * s, hy - 9 * s, 16 * s, 3 * s, hairCol);
-                drawRect(buf, hx - 9 * s, hy - 7 * s, 3 * s, 10 * s, hairCol);
-                drawRect(buf, hx + 6 * s, hy - 7 * s, 3 * s, 10 * s, hairCol);
-            } else if (hrMode == 4) { // תסרוקת אפרו נפוחה
-                drawCircle(buf, hx, hy - 8 * s, 6 * s, hairCol);
-                drawCircle(buf, hx - 5 * s, hy - 6 * s, 4 * s, hairCol);
-                drawCircle(buf, hx + 5 * s, hy - 6 * s, 4 * s, hairCol);
-            } else if (hrMode == 5) { // קוקו סמוראי / נינג'ה למעלה
-                drawRect(buf, hx - 7 * s, hy - 9 * s, 14 * s, 3 * s, hairCol);
-                drawCircle(buf, hx, hy - 12 * s, 3 * s, hairCol);
-            } else { // בלורית אלגנטית עם שביל בצד
-                drawRect(buf, hx - 7 * s, hy - 9 * s, 14 * s, 3 * s, hairCol);
-                drawCircle(buf, hx + 3 * s, hy - 6 * s, 2 * s, hairCol);
-            }
-        }
-    } else {
-        int hType = hatSt % 5;
-        if (hType == 1) { // כתר מלכותי משובץ
-            drawRect(buf, hx - 7 * s, hy - 10 * s, 14 * s, 4 * s, hatCol);
-            drawCircle(buf, hx - 5 * s, hy - 11 * s, 2 * s, gold);
-            drawCircle(buf, hx,         hy - 12 * s, 2 * s, red);
-            drawCircle(buf, hx + 5 * s, hy - 11 * s, 2 * s, gold);
-        } else if (hType == 2) { // מצנפת קוסם גבוהה
-            drawRect(buf, hx - 10 * s, hy - 8 * s, 20 * s, 3 * s, hatCol);
-            drawCircle(buf, hx, hy - 11 * s, 5 * s, hatCol);
-            drawCircle(buf, hx, hy - 15 * s, 3 * s, gold);
-        } else if (hType == 3) { // קסדת קרניים / ויקינג
-            drawRect(buf, hx - 7 * s, hy - 10 * s, 14 * s, 4 * s, hatCol);
-            drawCircle(buf, hx - 8 * s, hy - 11 * s, 3 * s, white);
-            drawCircle(buf, hx + 8 * s, hy - 11 * s, 3 * s, white);
-        } else if (hType == 4) { // הילת מלאך מרחפת
-            drawRect(buf, hx - 6 * s, hy - 13 * s, 12 * s, 3 * s, hatCol);
-        } else { // כובע מצחייה ספורטיבי
-            drawRect(buf, hx - 7 * s, hy - 10 * s, 14 * s, 4 * s, hatCol);
-            drawRect(buf, hx - 2 * s, hy - 7 * s, 11 * s, 2 * s, hatCol);
+            u16 col = getCustomPaletteColor(customChar.partColor[cat]);
+            renderStoredCustomPart(buf, cat, customChar.partStyle[cat], col, hx, hy, x, y, s, legL, legR, faceExpr);
         }
     }
 }
 
-// בדיקה אם הקטגוריה הנוכחית היא איבר קטן/פנימי כדי להפעיל זום מצלמה אוטומטי!
 static bool isSmallFacePartCategory(int cat) {
     return (cat == 0 || cat == 1 || cat == 2 || cat == 7 ||
             cat == 8 || cat == 9 || cat == 10 || cat == 11 || cat == 12);
 }
 
-// רינדור מסך מעבדת ההרכבה האישית (כולל מצלמת זום אוטומטית!) ומסך המקלדת העברית
 void renderCustomizerScreen(u16* buf) {
     for (int y = 0; y < SCREEN_H; y++) {
         u16 rowCol = C16(18, 25 + y / 10, 48 + y / 7);
@@ -544,14 +221,11 @@ void renderCustomizerScreen(u16* buf) {
     drawCircle(buf, 204, 70, 38, zoomFace ? C16(42, 65, 105) : C16(30, 48, 78));
 
     if (zoomFace) {
-        // מצלמת תקריב אוטומטית (Scale 300% ממוקדת באזור הראש/פנים/גבות/פה/שיער!)
         drawCustomCharacterSprite(buf, 204, 98, 300, CHAR_ANIM_WALK, EXPR_NORMAL, frames);
         drawHebrewString(buf, 204, 22, "זום פנים!", C16(120, 245, 255), 1);
     } else if (activeCategory == 5 || activeCategory == 6) {
-        // מיקוד מצלמה על פלג הגוף התחתון והנעליים!
         drawCustomCharacterSprite(buf, 204, 56, 200, CHAR_ANIM_WALK, EXPR_NORMAL, frames);
     } else {
-        // תצוגת גוף מלאה
         drawCustomCharacterSprite(buf, 204, 74, 150, CHAR_ANIM_WALK, EXPR_NORMAL, frames);
     }
     drawHebrewString(buf, 204, 114, customChar.nameHeb, green, 1);
@@ -566,7 +240,7 @@ void renderCustomizerScreen(u16* buf) {
     drawRect(buf, 134, 22, 24, 22, blue);
     drawHebrewString(buf, 146, 29, "!", white, 1);
 
-    // בחירת סגנון מתוך 200 אפשרויות בכל קטגוריה!
+    // בחירת סגנון מתוך 200 אפשרויות ייחודיות בכל קטגוריה!
     drawHebrewString(buf, 120, 52, "סגנון:", white, 1);
     drawRect(buf, 8, 48, 26, 20, purple);
     drawHebrewString(buf, 21, 54, "-", white, 1);
@@ -588,21 +262,17 @@ void renderCustomizerScreen(u16* buf) {
     drawRect(buf, 132, 72, 26, 20, purple);
     drawHebrewString(buf, 145, 78, "!", white, 1);
 
-    // כפתור ישיר למעבר מהיר בין כובע לתסרוקת שיער + כפתור הגרלת עיצוב מטורף!
     drawRect(buf, 8, 96, 72, 20, C16(45, 85, 75));
     drawHebrewString(buf, 44, 102, (customChar.partStyle[7] == 0) ? "מצב: שיער" : "מצב: כובע", green, 1);
 
     drawRect(buf, 84, 96, 74, 20, C16(40, 65, 95));
     drawHebrewString(buf, 121, 102, "הגרל הכל!", yellow, 1);
 
-    // שורת קיצור דרך לקמירות גבות ופה בזמן עריכת הפנים!
     drawRect(buf, 8, 120, 150, 18, C16(55, 40, 85));
     drawHebrewString(buf, 83, 125, "שנה קמירות גבות ופה!", C16(255, 200, 255), 1);
 
-    // הצגת המשימה הזמנית הפעילה
     drawHebrewString(buf, 128, 141, getActiveMissionDesc(), C16(130, 240, 250), 1);
 
-    // כפתורי שמירה/שם במקלדת וחזרה
     drawRect(buf, 8, 154, 70, 30, orange);
     drawHebrewString(buf, 43, 165, "חזור", white, 1);
 
@@ -624,6 +294,7 @@ void handleCustomizerTouch(int tx, int ty) {
                     if (letterIdx >= 1 && letterIdx <= 27 && kbLen < 9) {
                         kbGlyphs[kbLen++] = (u8)letterIdx;
                         syncGlyphsToUtf8Name();
+                        playCoinSfx(false);
                     }
                     return;
                 }
@@ -641,6 +312,7 @@ void handleCustomizerTouch(int tx, int ty) {
                 customChar.created = true;
                 unlockedChars[CUSTOM_CHAR_IDX] = true;
                 selectedCharIdx = CUSTOM_CHAR_IDX;
+                playCharacterVoiceSfx(CUSTOM_CHAR_IDX);
                 savePermanentData();
                 gameState = STATE_CUSTOMIZE;
             }
@@ -648,53 +320,45 @@ void handleCustomizerTouch(int tx, int ty) {
         return;
     }
 
-    // מעבר בין 14 הקטגוריות (המצלמה מתקרבת ומתרחקת אוטומטית!)
     if (ty >= 22 && ty <= 44) {
         if (tx >= 8 && tx <= 35) activeCategory = (activeCategory + CUSTOM_PARTS_COUNT - 1) % CUSTOM_PARTS_COUNT;
         else if (tx >= 130 && tx <= 160) activeCategory = (activeCategory + 1) % CUSTOM_PARTS_COUNT;
-    }
-    // מעבר בין 200 הסגנונות של הקטגוריה
-    else if (ty >= 48 && ty <= 68) {
+    } else if (ty >= 48 && ty <= 68) {
         if (tx >= 8 && tx <= 36) {
             customChar.partStyle[activeCategory] = (customChar.partStyle[activeCategory] + 199) % 200;
+            playCharacterVoiceSfx(CUSTOM_CHAR_IDX);
         } else if (tx >= 130 && tx <= 160) {
             customChar.partStyle[activeCategory] = (customChar.partStyle[activeCategory] + 1) % 200;
+            playCharacterVoiceSfx(CUSTOM_CHAR_IDX);
         }
-    }
-    // מעבר בין 64 הצבעים של האיבר
-    else if (ty >= 72 && ty <= 92) {
+    } else if (ty >= 72 && ty <= 92) {
         if (tx >= 8 && tx <= 36) {
             customChar.partColor[activeCategory] = (customChar.partColor[activeCategory] + 63) % 64;
         } else if (tx >= 130 && tx <= 160) {
             customChar.partColor[activeCategory] = (customChar.partColor[activeCategory] + 1) % 64;
         }
-    }
-    // החלפה מהירה בין מצב שיער (ללא כובע) למצב כובע + הגרלה אקראית
-    else if (ty >= 96 && ty <= 116) {
+    } else if (ty >= 96 && ty <= 116) {
         if (tx >= 8 && tx <= 80) {
             if (customChar.partStyle[7] == 0) {
                 customChar.partStyle[7] = 1;
                 activeCategory = 7;
             } else {
-                customChar.partStyle[7] = 0; // מסיר כובע ומציג את השיער!
+                customChar.partStyle[7] = 0;
                 if (customChar.partStyle[12] == 0) customChar.partStyle[12] = 1;
-                activeCategory = 12; // מעביר אוטומטית לעריכת השיער בזום פנים!
+                activeCategory = 12;
             }
         } else if (tx >= 84 && tx <= 158) {
             for (int i = 0; i < CUSTOM_PARTS_COUNT; i++) {
                 customChar.partStyle[i] = rand() % 199;
                 customChar.partColor[i] = rand() % 64;
             }
-            if (rand() % 2 == 0) customChar.partStyle[7] = 0; // 50% סיכוי להציג תסרוקת שיער ללא כובע!
+            if (rand() % 2 == 0) customChar.partStyle[7] = 0;
+            playCharacterVoiceSfx(CUSTOM_CHAR_IDX);
         }
-    }
-    // לחצן שינוי מהיר לקמירות הגבות והפה!
-    else if (ty >= 120 && ty <= 138 && tx >= 8 && tx <= 158) {
+    } else if (ty >= 120 && ty <= 138 && tx >= 8 && tx <= 158) {
         activeCategory = 9;
-        customChar.partStyle[9] = (customChar.partStyle[9] + 1) % 15;
-    }
-    // כפתורים תחתונים
-    else if (ty >= 154 && ty <= 186) {
+        customChar.partStyle[9] = (customChar.partStyle[9] + 1) % 200;
+    } else if (ty >= 154 && ty <= 186) {
         if (tx >= 8 && tx <= 78) {
             gameState = STATE_START;
         } else if (tx >= 84 && tx <= 162) {
@@ -703,6 +367,7 @@ void handleCustomizerTouch(int tx, int ty) {
             customChar.created = true;
             unlockedChars[CUSTOM_CHAR_IDX] = true;
             selectedCharIdx = CUSTOM_CHAR_IDX;
+            playCharacterVoiceSfx(CUSTOM_CHAR_IDX);
             savePermanentData();
             gameState = STATE_SHOP;
         }
