@@ -165,7 +165,7 @@ void renderBottomScreen(u16* buf) {
         drawRect(buf, 48, 106, 160, 32, yellow);
         drawHebrewString(buf, 128, 114, "חנות הדמויות", C16(25, 25, 25), 2);
 
-        // כפתור פרטים
+        // כפתור פרטים ושיא
         drawRect(buf, 68, 148, 120, 26, blue);
         drawHebrewString(buf, 128, 157, "פרטים ושיא", white, 1);
 
@@ -237,7 +237,7 @@ void renderBottomScreen(u16* buf) {
             drawRect(buf, bx, by, 72, 58, cardCol);
             if (sel) drawRect(buf, bx, by, 72, 3, green);
 
-            // הדמות הנבחרת מחייכת בחנות, ושאר הדמויות מציגות את אנימציית ההליכה שלהן!
+            // הדמות הנבחרת מחייכת בחנות, ושאר הדמויות מציגות את אנימציית ההליכה והמצמוץ שלהן!
             enum FaceExpr shopExpr = sel ? EXPR_HAPPY : EXPR_NORMAL;
             drawCharacterSpriteEx(buf, cIdx, bx + 36, by + 22, 100, CHAR_ANIM_WALK, shopExpr, 0, frames);
 
@@ -265,14 +265,32 @@ void renderBottomScreen(u16* buf) {
         drawHebrewString(buf, 216, 165, "הבא", white, 1);
 
     } else if (gameState == STATE_DETAILS) {
-        drawHebrewString(buf, 128, 25, "הרפתקאות הקופץ", yellow, 2);
-        drawHebrewString(buf, 128, 60, "גרסת נינטנדו משודרגת", white, 1);
-        drawHebrewString(buf, 128, 82, "כולל מאגר עקיצות ענק!", green, 1);
-        drawHebrewString(buf, 160, 110, "שיא אישי:", white, 1);
-        drawNumber(buf, 90, 110, highScore, yellow, 1);
+        // מסך פרטים וטבלת כל השיאים שנשמרים לתמיד!
+        drawHebrewString(buf, 128, 10, "הרפתקאות הקופץ", yellow, 2);
+        drawHebrewString(buf, 128, 30, "שיאים שנשמרו לתמיד:", green, 1);
 
-        drawRect(buf, 68, 142, 120, 32, orange);
-        drawHebrewString(buf, 128, 150, "סגור", white, 2);
+        // מסגרת טבלת 3 השיאים הגדולים
+        drawRect(buf, 18, 44, 220, 62, C16(25, 35, 58));
+
+        drawHebrewString(buf, 175, 50, "מקום ראשון:", yellow, 1);
+        drawNumber(buf, 65, 50, topScores[0], yellow, 1);
+
+        drawHebrewString(buf, 175, 68, "מקום שני:", C16(200, 210, 225), 1);
+        drawNumber(buf, 65, 68, topScores[1], C16(200, 210, 225), 1);
+
+        drawHebrewString(buf, 175, 86, "מקום שלישי:", C16(215, 145, 75), 1);
+        drawNumber(buf, 65, 86, topScores[2], C16(215, 145, 75), 1);
+
+        // הצגת שיא הביומה הרחוקה ביותר ומספר המשחקים ששוחקו
+        drawHebrewString(buf, 175, 114, "שיא עולם:", white, 1);
+        drawHebrewString(buf, 75,  114, BIOMES[bestBiomeIdx].nameHeb, green, 1);
+
+        drawHebrewString(buf, 175, 132, "משחקים:", white, 1);
+        drawNumber(buf, 65, 132, totalGamesPlayed, blue, 1);
+
+        // כפתור סגירה
+        drawRect(buf, 68, 154, 120, 28, orange);
+        drawHebrewString(buf, 128, 160, "סגור", white, 2);
     }
 }
  
