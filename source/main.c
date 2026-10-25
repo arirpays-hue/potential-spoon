@@ -1,10 +1,12 @@
 #include "game.h"
+#include <fat.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #define C16(r,g,b) (0x8000 | (((b)>>3)<<10) | (((g)>>3)<<5) | ((r)>>3))
-#define SAVE_MAGIC 0x4A4D503A // חתימת זיהוי מעודכנת לשמירת הדמות בהרכבה אישית והשיאים!
+#define SAVE_MAGIC 0x4A4D503C // חתימת זיהוי לשמירת 14 קטגוריות ההרכבה האישית והשיאים!
 
 enum GameState gameState = STATE_START;
 Player player;
@@ -13,7 +15,8 @@ int highScore = 0;
 int topScores[3] = {0, 0, 0};
 int bestBiomeIdx = 0;
 int totalGamesPlayed = 0;
-int coinsCount = 0; // מתחילים מ-0 מטבעות כדי שלא יהיה ניתן לקנות דמויות על הסבב הראשון!
+int coinsCount = 0;       // מתחילים מ-0 מטבעות כדי שלא יהיה ניתן לקנות דמויות על הסבב הראשון!
+int totalCoinsEarned = 0; // סך כל המטבעות שהורווחו אי פעם!
 int selectedCharIdx = 0;
 bool unlockedChars[TOTAL_SHOP_CHARS] = {false};
 int currentBiomeIdx = 0;
@@ -43,10 +46,11 @@ Coin coins[6];
 BgElement bgElements[6];
 EnvParticle envParticles[25];
 
-static u16 topBuffer[SCREEN_W * SCREEN_H];
-static u16 bottomBuffer[SCREEN_W * SCREEN_H];
+static u16 topBuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
+static u16 bottomBuffer[SCREEN_W * SCREEN_H] __attribute__((aligned(32)));
+static bool fatInitialized = false;
 
-// מבנה הנתונים שנשמר לתמיד בזיכרון הקונסולה/כרטיס (כולל הדמות בהרכבה אישית!)
+// מבנה הנתונים שנשמר לתמיד בכרטיס הזיכרון (כולל הדמות בהרכבה אישית!)
 typedef struct {
     u32 magic;
     int highScore;
@@ -54,6 +58,7 @@ typedef struct {
     int bestBiomeIdx;
     int totalGamesPlayed;
     int coinsCount;
+    int totalCoinsEarned;
     int selectedCharIdx;
     u8 unlocked[TOTAL_SHOP_CHARS];
     CustomCharData savedCustomChar;
@@ -71,8 +76,10 @@ int getRequiredBiomeForChar(int cIdx) {
     return 0;
 }
 
-// שמירה בטוחה וישירה לתמיד לזיכרון ה-SRAM של ה-DS (כולל הדמות שיצרת!)
+// שמירה תקנית ובטוחה לכרטיס ה-SD באמצעות libfat (ללא גישה ל-0x0A000000 שגורמת לבאג המסך!)
 void savePermanentData(void) {
+    if (!fatInitialized) return;
+
     SaveFileData data;
     memset(&data, 0, sizeof(SaveFileData));
     data.magic = SAVE_MAGIC;
@@ -83,6 +90,7 @@ void savePermanentData(void) {
     data.bestBiomeIdx = bestBiomeIdx;
     data.totalGamesPlayed = totalGamesPlayed;
     data.coinsCount = coinsCount;
+    data.totalCoinsEarned = totalCoinsEarned;
     data.selectedCharIdx = selectedCharIdx;
     for (int i = 0; i < TOTAL_SHOP_CHARS; i++) {
         data.unlocked[i] = unlockedChars[i] ? 1 : 0;
@@ -90,42 +98,41 @@ void savePermanentData(void) {
     data.savedCustomChar = customChar;
     data.savedCustomRewards = unlockedCustomRewards;
 
-    sysSetCartOwner(BUS_OWNER_ARM9);
-    volatile u8* sram = (volatile u8*)0x0A000000;
-    const u8* src = (const u8*)&data;
-    for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
-        sram[i] = src[i];
+    FILE* fp = fopen("jumper_ds.sav", "wb");
+    if (fp) {
+        fwrite(&data, sizeof(SaveFileData), 1, fp);
+        fclose(fp);
     }
 }
 
-// טעינה בטוחה ומידית של כל השיאים, הדמויות והדמות האישית בעת הדלקת המשחק
+// טעינה תקנית ובטוחה של כל השיאים, המטבעות והדמות האישית בעת הדלקת המשחק
 void loadPermanentData(void) {
+    if (!fatInitialized) return;
+
     SaveFileData data;
     memset(&data, 0, sizeof(SaveFileData));
 
-    sysSetCartOwner(BUS_OWNER_ARM9);
-    volatile u8* sram = (volatile u8*)0x0A000000;
-    u8* dst = (u8*)&data;
-    for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
-        dst[i] = sram[i];
-    }
-
-    if (data.magic == SAVE_MAGIC) {
-        highScore = (data.highScore >= 0) ? data.highScore : 0;
-        topScores[0] = (data.topScores[0] >= 0) ? data.topScores[0] : 0;
-        topScores[1] = (data.topScores[1] >= 0) ? data.topScores[1] : 0;
-        topScores[2] = (data.topScores[2] >= 0) ? data.topScores[2] : 0;
-        bestBiomeIdx = (data.bestBiomeIdx >= 0 && data.bestBiomeIdx < NUM_BIOMES) ? data.bestBiomeIdx : 0;
-        totalGamesPlayed = (data.totalGamesPlayed >= 0) ? data.totalGamesPlayed : 0;
-        coinsCount = (data.coinsCount >= 0) ? data.coinsCount : 0;
-        selectedCharIdx = (data.selectedCharIdx >= 0 && data.selectedCharIdx < TOTAL_SHOP_CHARS) ? data.selectedCharIdx : 0;
-        for (int i = 0; i < TOTAL_SHOP_CHARS; i++) {
-            unlockedChars[i] = (data.unlocked[i] != 0);
+    FILE* fp = fopen("jumper_ds.sav", "rb");
+    if (fp) {
+        if (fread(&data, sizeof(SaveFileData), 1, fp) == 1 && data.magic == SAVE_MAGIC) {
+            highScore = (data.highScore >= 0) ? data.highScore : 0;
+            topScores[0] = (data.topScores[0] >= 0) ? data.topScores[0] : 0;
+            topScores[1] = (data.topScores[1] >= 0) ? data.topScores[1] : 0;
+            topScores[2] = (data.topScores[2] >= 0) ? data.topScores[2] : 0;
+            bestBiomeIdx = (data.bestBiomeIdx >= 0 && data.bestBiomeIdx < NUM_BIOMES) ? data.bestBiomeIdx : 0;
+            totalGamesPlayed = (data.totalGamesPlayed >= 0) ? data.totalGamesPlayed : 0;
+            coinsCount = (data.coinsCount >= 0) ? data.coinsCount : 0;
+            totalCoinsEarned = (data.totalCoinsEarned >= 0) ? data.totalCoinsEarned : coinsCount;
+            selectedCharIdx = (data.selectedCharIdx >= 0 && data.selectedCharIdx < TOTAL_SHOP_CHARS) ? data.selectedCharIdx : 0;
+            for (int i = 0; i < TOTAL_SHOP_CHARS; i++) {
+                unlockedChars[i] = (data.unlocked[i] != 0);
+            }
+            unlockedChars[0] = true;
+            customChar = data.savedCustomChar;
+            unlockedCustomRewards = data.savedCustomRewards;
+            if (customChar.created) unlockedChars[CUSTOM_CHAR_IDX] = true;
         }
-        unlockedChars[0] = true;
-        customChar = data.savedCustomChar;
-        unlockedCustomRewards = data.savedCustomRewards;
-        if (customChar.created) unlockedChars[CUSTOM_CHAR_IDX] = true;
+        fclose(fp);
     }
 }
 
@@ -413,7 +420,7 @@ static void updateGamePhysics(void) {
                 player.x + player.w - pad > obstacles[i].x + pad &&
                 player.y + pad < obstacles[i].y + obstacles[i].h - pad &&
                 player.y + player.h - pad > obstacles[i].y + pad) {
-           
+          
                 lastDeathObs = obstacles[i].type;
                 obstacles[i].hitAnimTimer = 1;
                 deathAnimTimer = 1;
@@ -444,6 +451,7 @@ static void updateGamePhysics(void) {
             if (player.x < coins[i].x + 12 && player.x + player.w > coins[i].x &&
                 player.y < coins[i].y + 12 && player.y + player.h > coins[i].y) {
                 coinsCount += coins[i].value;
+                totalCoinsEarned += coins[i].value;
                 happyFaceTimer = 45;
                 if (coins[i].value == 20) showBubble("יהלום!");
                 coins[i].active = false;
@@ -487,7 +495,10 @@ static void updateGamePhysics(void) {
 }
 
 int main(void) {
-    // 1. אתחול מיידי של שני המסכים כדי למנוע מסך לבן בכניסה!
+    // 1. הפעלה ואיפוס נקי של שני המסכים (מונע 100% מהפסים המשובשים!)
+    powerOn(POWER_ALL_2D);
+    lcdMainOnTop();
+
     videoSetMode(MODE_5_2D);
     vramSetBankA(VRAM_A_MAIN_BG);
     int bgTop = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
@@ -498,10 +509,19 @@ int main(void) {
     int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     u16* vramBottom = bgGetGfxPtr(bgSub);
 
+    // איפוס מלא של הבאפרים ושל ה-VRAM לפני הפריים הראשון
+    for (int i = 0; i < 256 * 256; i++) {
+        vramTop[i] = C16(15, 22, 42);
+        vramBottom[i] = C16(15, 22, 42);
+    }
+
     srand(time(NULL));
     unlockedChars[0] = true; // דמות ברירת מחדל פתוחה
     initDefaultCustomChar();
-    loadPermanentData();     // טעינה בטוחה מה-SRAM ללא fopen!
+
+    // 2. אתחול תקני של מערכת הקבצים בכרטיס (libfat) וטעינת השמירה
+    fatInitialized = fatInitDefault();
+    loadPermanentData();
 
     resetGame();
     gameState = STATE_START;
@@ -577,7 +597,6 @@ int main(void) {
                     gameState = STATE_SHOP;
                 }
             } else if (gameState == STATE_SHOP) {
-                // בחירה או קניית דמות מתוך ה-6 שבעמוד הנוכחי (כולל בדיקת טשטוש רמה ודמות אישית!)
                 for (int i = 0; i < 6; i++) {
                     int cIdx = shopPage * 6 + i;
                     if (cIdx >= TOTAL_SHOP_CHARS) break;
@@ -593,7 +612,7 @@ int main(void) {
                             }
                         } else {
                             int reqBiome = getRequiredBiomeForChar(cIdx);
-                            if (bestBiomeIdx >= reqBiome) { // ניתן לקנות או לבחור רק אם הוסר הטשטוש!
+                            if (bestBiomeIdx >= reqBiome) {
                                 if (unlockedChars[cIdx]) {
                                     selectedCharIdx = cIdx;
                                     savePermanentData();
@@ -607,7 +626,6 @@ int main(void) {
                         }
                     }
                 }
-                // כפתורי ניווט בחנות
                 if (ty >= 154 && ty <= 184) {
                     if (tx >= 12 && tx <= 67 && shopPage > 0) shopPage--;
                     else if (tx >= 75 && tx <= 181) gameState = STATE_START;
@@ -620,16 +638,15 @@ int main(void) {
             }
         }
 
-        // רינדור שני המסכים, ניקוי מטמון והעברה מהירה ב-DMA ל-VRAM
+        // רינדור שני המסכים והעתקה ישירה ונקייה ל-VRAM בזמן VBlank
         renderTopScreen(topBuffer);
         renderBottomScreen(bottomBuffer);
 
-        DC_FlushRange(topBuffer, SCREEN_W * SCREEN_H * 2);
-        DC_FlushRange(bottomBuffer, SCREEN_W * SCREEN_H * 2);
-
         swiWaitForVBlank();
-        dmaCopy(topBuffer, vramTop, SCREEN_W * SCREEN_H * 2);
-        dmaCopy(bottomBuffer, vramBottom, SCREEN_W * SCREEN_H * 2);
+        for (int i = 0; i < SCREEN_W * SCREEN_H; i++) {
+            vramTop[i] = topBuffer[i];
+            vramBottom[i] = bottomBuffer[i];
+        }
     }
     return 0;
 }
