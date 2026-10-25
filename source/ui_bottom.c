@@ -126,7 +126,6 @@ static void drawHebrewMultiline(u16* buf, int centerX, int y, const char* str, u
         drawHebrewString(buf, centerX, y, str, color, 1);
         return;
     }
-    // מציאת הרווח באמצע המשפט
     int split = len / 2;
     while (split < len && str[split] != ' ') split++;
     if (split >= len) {
@@ -171,16 +170,27 @@ void renderBottomScreen(u16* buf) {
         drawHebrewString(buf, 128, 157, "פרטים ושיא", white, 1);
 
     } else if (gameState == STATE_PLAYING || gameState == STATE_PAUSED || gameState == STATE_COUNTDOWN) {
-        drawHebrewString(buf, 128, 16, "גע במסך או לחץ לקפיצה!", yellow, 1);
+        drawHebrewString(buf, 128, 14, "גע במסך או לחץ לקפיצה!", yellow, 1);
 
-        // תצוגת הדמות הנוכחית במרכז המסך התחתון
-        drawCircle(buf, 128, 72, 28, C16(30, 45, 70));
-        drawCharacterSprite(buf, selectedCharIdx, 128, 74, 120, (gameState == STATE_PLAYING), player.grounded, 0, frames);
-        drawHebrewString(buf, 128, 108, CHARACTERS[selectedCharIdx].nameHeb, green, 1);
+        // הילה דינמית שמשנה צבע כשמפלצת מתקרבת או באיסוף מטבע!
+        u16 ringCol = C16(30, 45, 70);
+        if (currentFaceExpr == EXPR_SCARED) ringCol = C16(120, 30, 40);
+        else if (currentFaceExpr == EXPR_HAPPY) ringCol = C16(30, 95, 60);
+
+        drawCircle(buf, 128, 70, 30, ringCol);
+        drawCharacterSpriteEx(buf, selectedCharIdx, 128, 72, 120, playerAnimState, currentFaceExpr, 0, frames);
+        drawHebrewString(buf, 128, 106, CHARACTERS[selectedCharIdx].nameHeb, green, 1);
+
+        // חיווי טקסטואלי להבעת הפנים הדינמית של הדמות במסך התחתון!
+        if (currentFaceExpr == EXPR_SCARED) {
+            drawHebrewString(buf, 128, 120, "זהירות! אויב מתקרב!", orange, 1);
+        } else if (currentFaceExpr == EXPR_HAPPY) {
+            drawHebrewString(buf, 128, 120, "איזה יופי!", yellow, 1);
+        }
 
         // כפתור השהיה / המשך
-        drawRect(buf, 68, 134, 120, 36, (gameState == STATE_PAUSED) ? green : blue);
-        drawHebrewString(buf, 128, 144, (gameState == STATE_PAUSED) ? "המשך משחק" : "השהה משחק", white, 2);
+        drawRect(buf, 68, 136, 120, 36, (gameState == STATE_PAUSED) ? green : blue);
+        drawHebrewString(buf, 128, 146, (gameState == STATE_PAUSED) ? "המשך משחק" : "השהה משחק", white, 2);
 
     } else if (gameState == STATE_GAMEOVER) {
         drawHebrewString(buf, 128, 12, "נפסלת!", orange, 2);
@@ -209,7 +219,7 @@ void renderBottomScreen(u16* buf) {
         drawCircle(buf, 22, 10, 5, yellow);
         drawNumber(buf, 32, 6, coinsCount, yellow, 1);
 
-        // רשת של 6 דמויות בעמוד (3x2) עם ציור אמיתי של כל דמות!
+        // רשת של 6 דמויות בעמוד (3x2) עם ציור מעוגל ומפורט של כל דמות!
         int startIdx = shopPage * 6;
         for (int i = 0; i < 6; i++) {
             int cIdx = startIdx + i;
@@ -227,8 +237,9 @@ void renderBottomScreen(u16* buf) {
             drawRect(buf, bx, by, 72, 58, cardCol);
             if (sel) drawRect(buf, bx, by, 72, 3, green);
 
-            // ציור הדמות האמיתית בתוך כרטיס החנות!
-            drawCharacterSprite(buf, cIdx, bx + 36, by + 22, 100, true, true, 0, frames);
+            // הדמות הנבחרת מחייכת בחנות, ושאר הדמויות מציגות את אנימציית ההליכה שלהן!
+            enum FaceExpr shopExpr = sel ? EXPR_HAPPY : EXPR_NORMAL;
+            drawCharacterSpriteEx(buf, cIdx, bx + 36, by + 22, 100, CHAR_ANIM_WALK, shopExpr, 0, frames);
 
             // שם הדמות בעברית
             drawHebrewString(buf, bx + 36, by + 37, CHARACTERS[cIdx].nameHeb, white, 1);
@@ -264,3 +275,4 @@ void renderBottomScreen(u16* buf) {
         drawHebrewString(buf, 128, 150, "סגור", white, 2);
     }
 }
+ 
