@@ -1,6 +1,5 @@
 #include "game.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -58,9 +57,10 @@ typedef struct {
     u8 unlocked[NUM_CHARS];
 } SaveFileData;
 
-// שמירה כפולה לתמיד: גם ל-SRAM של ה-DS וגם לקובץ שמירה בכרטיס!
+// שמירה בטוחה וישירה לתמיד לזיכרון ה-SRAM של ה-DS (ללא fopen שגורם למסך לבן!)
 void savePermanentData(void) {
     SaveFileData data;
+    memset(&data, 0, sizeof(SaveFileData));
     data.magic = SAVE_MAGIC;
     data.highScore = highScore;
     data.topScores[0] = topScores[0];
@@ -74,54 +74,31 @@ void savePermanentData(void) {
         data.unlocked[i] = unlockedChars[i] ? 1 : 0;
     }
 
-    // 1. שמירה לזיכרון הגיבוי המובנה של ה-DS (SRAM)
     sysSetCartOwner(BUS_OWNER_ARM9);
-    u8* sram = (u8*)SRAM;
+    volatile u8* sram = (volatile u8*)0x0A000000;
     const u8* src = (const u8*)&data;
     for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
         sram[i] = src[i];
     }
-
-    // 2. שמירה לקובץ אם מערכת קבצים זמינה
-    FILE* fp = fopen("jumper_ds_save.sav", "wb");
-    if (fp) {
-        fwrite(&data, sizeof(SaveFileData), 1, fp);
-        fclose(fp);
-    }
 }
 
-// טעינת כל השיאים והנתונים שנשמרו לתמיד בעת הדלקת המשחק
+// טעינה בטוחה ומידית של כל השיאים והנתונים שנשמרו לתמיד בעת הדלקת המשחק
 void loadPermanentData(void) {
     SaveFileData data;
-    bool loaded = false;
+    memset(&data, 0, sizeof(SaveFileData));
 
-    // ניסיון ראשון: טעינה מקובץ שמירה
-    FILE* fp = fopen("jumper_ds_save.sav", "rb");
-    if (fp) {
-        if (fread(&data, sizeof(SaveFileData), 1, fp) == 1 && data.magic == SAVE_MAGIC) {
-            loaded = true;
-        }
-        fclose(fp);
+    sysSetCartOwner(BUS_OWNER_ARM9);
+    volatile u8* sram = (volatile u8*)0x0A000000;
+    u8* dst = (u8*)&data;
+    for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
+        dst[i] = sram[i];
     }
 
-    // ניסיון שני: טעינה מ-SRAM של ה-DS
-    if (!loaded) {
-        sysSetCartOwner(BUS_OWNER_ARM9);
-        u8* sram = (u8*)SRAM;
-        u8* dst = (u8*)&data;
-        for (unsigned int i = 0; i < sizeof(SaveFileData); i++) {
-            dst[i] = sram[i];
-        }
-        if (data.magic == SAVE_MAGIC) {
-            loaded = true;
-        }
-    }
-
-    if (loaded) {
-        highScore = data.highScore;
-        topScores[0] = data.topScores[0];
-        topScores[1] = data.topScores[1];
-        topScores[2] = data.topScores[2];
+    if (data.magic == SAVE_MAGIC) {
+        highScore = (data.highScore >= 0) ? data.highScore : 0;
+        topScores[0] = (data.topScores[0] >= 0) ? data.topScores[0] : 0;
+        topScores[1] = (data.topScores[1] >= 0) ? data.topScores[1] : 0;
+        topScores[2] = (data.topScores[2] >= 0) ? data.topScores[2] : 0;
         bestBiomeIdx = (data.bestBiomeIdx >= 0 && data.bestBiomeIdx < NUM_BIOMES) ? data.bestBiomeIdx : 0;
         totalGamesPlayed = (data.totalGamesPlayed >= 0) ? data.totalGamesPlayed : 0;
         coinsCount = (data.coinsCount >= 0) ? data.coinsCount : 0;
@@ -376,7 +353,7 @@ static void updateGamePhysics(void) {
                 player.x + player.w - pad > obstacles[i].x + pad &&
                 player.y + pad < obstacles[i].y + obstacles[i].h - pad &&
                 player.y + player.h - pad > obstacles[i].y + pad) {
-              
+             
                 lastDeathObs = obstacles[i].type;
                 obstacles[i].hitAnimTimer = 1; // מפעיל אנימציית תקיפה לאויב הפוגע!
                 deathAnimTimer = 1;
@@ -448,11 +425,7 @@ static void updateGamePhysics(void) {
 }
 
 int main(void) {
-    srand(time(NULL));
-    unlockedChars[0] = true; // דמות ברירת מחדל פתוחה
-    loadPermanentData();     // טעינת כל השיאים והדמויות שנשמרו לתמיד!
-
-    // אתחול שני המסכים של ה-DS במצב 16-bit Bitmap לחופש גרפי מקסימלי!
+    // 1. אתחול מיידי של שני המסכים כדי למנוע מסך לבן בכניסה!
     videoSetMode(MODE_5_2D);
     vramSetBankA(VRAM_A_MAIN_BG);
     int bgTop = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
@@ -462,6 +435,10 @@ int main(void) {
     vramSetBankC(VRAM_C_SUB_BG);
     int bgSub = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     u16* vramBottom = bgGetGfxPtr(bgSub);
+
+    srand(time(NULL));
+    unlockedChars[0] = true; // דמות ברירת מחדל פתוחה
+    loadPermanentData();     // טעינה בטוחה מה-SRAM ללא fopen!
 
     resetGame();
     gameState = STATE_START;
@@ -564,9 +541,12 @@ int main(void) {
             }
         }
 
-        // רינדור שני המסכים והעברה מהירה ב-DMA ל-VRAM
+        // רינדור שני המסכים, ניקוי מטמון והעברה מהירה ב-DMA ל-VRAM
         renderTopScreen(topBuffer);
         renderBottomScreen(bottomBuffer);
+
+        DC_FlushRange(topBuffer, SCREEN_W * SCREEN_H * 2);
+        DC_FlushRange(bottomBuffer, SCREEN_W * SCREEN_H * 2);
 
         swiWaitForVBlank();
         dmaCopy(topBuffer, vramTop, SCREEN_W * SCREEN_H * 2);
