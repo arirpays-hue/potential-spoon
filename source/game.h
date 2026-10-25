@@ -11,6 +11,7 @@
 #define NUM_CHARS 99
 #define CUSTOM_CHAR_IDX 99
 #define TOTAL_SHOP_CHARS 100
+#define CUSTOM_PARTS_COUNT 14
 
 // מצבי משחק (כולל מעבדת ההרכבה האישית והמקלדת העברית!)
 enum GameState {
@@ -129,11 +130,14 @@ typedef struct {
     u8 specialAcc; // 0=כובע, 1=כתר, 2=מצנפת קוסם, 3=קרניים, 4=הילה, 5=קסדה, 6=מסכה
 } CharData;
 
-// מבנה הדמות בהרכבה אישית שנשמרת לנצח בחנות!
+// מבנה הדמות בהרכבה אישית (14 קטגוריות מלאות כולל גבות, קמירות, אפים, פיות, שיער ואביזרים!)
 typedef struct {
     char nameHeb[24];
-    u8 partStyle[8]; // 0=פנים, 1=זקן, 2=עיניים, 3=גוף, 4=ידיים, 5=רגליים, 6=נעליים, 7=כובעים (200 אפשרויות לכל קטגוריה!)
-    u8 partColor[8]; // 64 צבעים לבחירה לכל איבר!
+    // אינדקסים של 14 הקטגוריות:
+    // 0=פנים, 1=זקן, 2=עיניים, 3=גוף, 4=ידיים, 5=רגליים, 6=נעליים, 7=כובעים,
+    // 8=גבות, 9=קמירות גבות ופה, 10=אפים, 11=פיות, 12=שיער (כשללא כובע), 13=גלימות וכנפיים
+    u8 partStyle[CUSTOM_PARTS_COUNT];
+    u8 partColor[CUSTOM_PARTS_COUNT];
     bool created;
 } CustomCharData;
 
@@ -187,6 +191,7 @@ extern int topScores[3];       // 3 השיאים הגדולים שנשמרים �
 extern int bestBiomeIdx;       // הביומה הכי רחוקה שהשחקן הגיע אליה אי פעם!
 extern int totalGamesPlayed;   // סך כל המשחקים ששוחקו!
 extern int coinsCount;
+extern int totalCoinsEarned;   // סך כל המטבעות שהורווחו אי פעם!
 extern int selectedCharIdx;
 extern bool unlockedChars[ TOTAL_SHOP_CHARS ];
 extern int currentBiomeIdx;
