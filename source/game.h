@@ -174,7 +174,8 @@ extern int highScore;
 extern int topScores[3];       // 3 השיאים הגדולים שנשמרים לתמיד!
 extern int bestBiomeIdx;       // הביומה הכי רחוקה שהשחקן הגיע אליה אי פעם!
 extern int totalGamesPlayed;   // סך כל המשחקים ששוחקו!
-extern int coinsCount;
+extern int coinsCount;         // כמות מטבעות נוכחית בחנות ובמשחק (נשמרת לתמיד!)
+extern int totalCoinsEarned;   // סך כל המטבעות שהורווחו אי פעם במשחק (נשמר לתמיד!)
 extern int selectedCharIdx;
 extern bool unlockedChars[NUM_CHARS];
 extern int currentBiomeIdx;
@@ -200,7 +201,7 @@ extern float smoothGround[3];
 extern const BiomeData BIOMES[NUM_BIOMES];
 extern const CharData CHARACTERS[NUM_CHARS];
 
-// פונקציות שמירה וטעינה קבועה של כל השיאים והדמויות
+// פונקציות שמירה וטעינה קבועה של כל השיאים, המטבעות והדמויות
 void savePermanentData(void);
 void loadPermanentData(void);
 
@@ -220,4 +221,3 @@ void drawHebrewString(u16* buf, int centerX, int y, const char* utf8Str, u16 col
 void drawNumber(u16* buf, int x, int y, int num, u16 color, int scale);
 
 #endif
- 
