@@ -22,6 +22,15 @@ const char* bubbleText = NULL;
 const char* currentRoastText = NULL;
 enum ObsType lastDeathObs = OBS_ROCK;
 
+// משתני מצב ל-4 האנימציות של הדמות, הבעות הפנים ומעבר הביומות ההדרגתי
+enum CharAnimState playerAnimState = CHAR_ANIM_WALK;
+enum FaceExpr currentFaceExpr = EXPR_NORMAL;
+int happyFaceTimer = 0;
+int deathAnimTimer = 0;
+float smoothSkyTop[3] = {135.0f, 206.0f, 235.0f};
+float smoothSkyBot[3] = {224.0f, 255.0f, 255.0f};
+float smoothGround[3] = {34.0f,  139.0f, 34.0f};
+
 Obstacle obstacles[6];
 Coin coins[6];
 BgElement bgElements[6];
@@ -50,8 +59,20 @@ static void resetGame(void) {
     player.jumpBuffer = 0;
     player.coyoteTimer = 0;
 
+    playerAnimState = CHAR_ANIM_WALK;
+    currentFaceExpr = EXPR_NORMAL;
+    happyFaceTimer = 0;
+    deathAnimTimer = 0;
+
+    for (int c = 0; c < 3; c++) {
+        smoothSkyTop[c] = (float)BIOMES[0].skyTop[c];
+        smoothSkyBot[c] = (float)BIOMES[0].skyBot[c];
+        smoothGround[c] = (float)BIOMES[0].ground[c];
+    }
+
     for (int i = 0; i < 6; i++) {
         obstacles[i].active = false;
+        obstacles[i].hitAnimTimer = 0;
         coins[i].active = false;
         bgElements[i].active = true;
         bgElements[i].x = i * 50 + (rand() % 20);
@@ -73,6 +94,7 @@ static void updateGamePhysics(void) {
     int dispScore = score / 10;
 
     if (bubbleTimer > 0) bubbleTimer--;
+    if (happyFaceTimer > 0) happyFaceTimer--;
 
     // עדכון ביומה לפי ניקוד (27 עולמות!)
     int newBiome = 0;
@@ -85,6 +107,14 @@ static void updateGamePhysics(void) {
     if (newBiome != currentBiomeIdx) {
         currentBiomeIdx = newBiome;
         showBubble(BIOMES[currentBiomeIdx].nameHeb);
+    }
+
+    // מעבר הדרגתי ומציאותי בין צבעי הביומות (ללא מעבר "בבום"!)
+    const BiomeData* targetB = &BIOMES[currentBiomeIdx];
+    for (int c = 0; c < 3; c++) {
+        smoothSkyTop[c] += ((float)targetB->skyTop[c] - smoothSkyTop[c]) * 0.025f;
+        smoothSkyBot[c] += ((float)targetB->skyBot[c] - smoothSkyBot[c]) * 0.025f;
+        smoothGround[c] += ((float)targetB->ground[c] - smoothGround[c]) * 0.025f;
     }
 
     currentSpeed = 3.2f + (dispScore * 0.004f);
@@ -130,9 +160,11 @@ static void updateGamePhysics(void) {
         player.dy = 0.0f;
         player.grounded = true;
         player.angle = 0;
+        playerAnimState = CHAR_ANIM_WALK;
     } else {
         player.grounded = false;
         player.angle += (style == STYLE_SPIN) ? 16 : 4;
+        playerAnimState = CHAR_ANIM_JUMP;
     }
 
     // עדכון תפאורת רקע
@@ -154,6 +186,7 @@ static void updateGamePhysics(void) {
         for (int i = 0; i < 6; i++) {
             if (!obstacles[i].active) {
                 obstacles[i].active = true;
+                obstacles[i].hitAnimTimer = 0;
                 obstacles[i].x = SCREEN_W + 10;
                 bool isAir = (rand() % 10 >= 7);
                 obstacles[i].type = isAir ? BIOMES[currentBiomeIdx].airObs : BIOMES[currentBiomeIdx].groundObs;
@@ -189,17 +222,37 @@ static void updateGamePhysics(void) {
         }
     }
 
+    // בדיקה אם אויב או מכשול קרובים לשחקן (עבור הבעת הפנים המפוחדת במסך התחתון!)
+    bool dangerNear = false;
+
     // תנועת מכשולים ובדיקת התנגשות
     for (int i = 0; i < 6; i++) {
         if (obstacles[i].active) {
             obstacles[i].x -= currentSpeed;
+
+            float dist = obstacles[i].x - (player.x + player.w);
+            if (dist > -10.0f && dist < 78.0f) {
+                dangerNear = true;
+            }
+
             int pad = 5;
             if (player.x + pad < obstacles[i].x + obstacles[i].w - pad &&
                 player.x + player.w - pad > obstacles[i].x + pad &&
                 player.y + pad < obstacles[i].y + obstacles[i].h - pad &&
                 player.y + player.h - pad > obstacles[i].y + pad) {
-                
+               
                 lastDeathObs = obstacles[i].type;
+                obstacles[i].hitAnimTimer = 1; // מפעיל אנימציית תקיפה לאויב הפוגע!
+                deathAnimTimer = 1;
+
+                // בחירת אנימציית הפגיעה הייחודית לדמות: אויב מעופף לעומת אויב קרקע!
+                if (lastDeathObs >= OBS_BIRD_START) {
+                    playerAnimState = CHAR_ANIM_HIT_AIR;
+                } else {
+                    playerAnimState = CHAR_ANIM_HIT_GROUND;
+                }
+                currentFaceExpr = EXPR_HURT;
+
                 int finalSc = score / 10;
                 if (finalSc > highScore) highScore = finalSc;
                 // שליפת עקיצה מותאמת אישית ממאגר ה-C הענק!
@@ -218,12 +271,22 @@ static void updateGamePhysics(void) {
             if (player.x < coins[i].x + 12 && player.x + player.w > coins[i].x &&
                 player.y < coins[i].y + 12 && player.y + player.h > coins[i].y) {
                 coinsCount += coins[i].value;
+                happyFaceTimer = 45; // הבעת פנים שמחה בדמות שבמסך התחתון!
                 if (coins[i].value == 20) showBubble("יהלום!");
                 coins[i].active = false;
             } else if (coins[i].x < -20) {
                 coins[i].active = false;
             }
         }
+    }
+
+    // עדכון הבעת הפנים הדינמית של הדמות
+    if (dangerNear) {
+        currentFaceExpr = EXPR_SCARED;
+    } else if (happyFaceTimer > 0) {
+        currentFaceExpr = EXPR_HAPPY;
+    } else {
+        currentFaceExpr = EXPR_NORMAL;
     }
 
     // חלקיקי מזג אוויר לפי הביומה
@@ -282,6 +345,14 @@ int main(void) {
             }
         } else {
             frames++;
+            if (gameState == STATE_GAMEOVER) {
+                deathAnimTimer++;
+                for (int i = 0; i < 6; i++) {
+                    if (obstacles[i].active && obstacles[i].hitAnimTimer > 0) {
+                        obstacles[i].hitAnimTimer++;
+                    }
+                }
+            }
             if ((down & KEY_A) && (gameState == STATE_START || gameState == STATE_GAMEOVER)) {
                 resetGame();
                 gameState = STATE_PLAYING;
@@ -362,3 +433,4 @@ int main(void) {
     }
     return 0;
 }
+ 
