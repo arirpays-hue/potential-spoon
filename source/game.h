@@ -9,8 +9,10 @@
 #define GROUND_Y 152
 #define NUM_BIOMES 27
 #define NUM_CHARS 99
+#define CUSTOM_CHAR_IDX 99
+#define TOTAL_SHOP_CHARS 100
 
-// מצבי משחק
+// מצבי משחק (כולל מעבדת ההרכבה האישית והמקלדת העברית!)
 enum GameState {
     STATE_START,
     STATE_PLAYING,
@@ -18,7 +20,9 @@ enum GameState {
     STATE_COUNTDOWN,
     STATE_GAMEOVER,
     STATE_SHOP,
-    STATE_DETAILS
+    STATE_DETAILS,
+    STATE_CUSTOMIZE,
+    STATE_CUSTOM_KEYBOARD
 };
 
 // סגנונות קפיצה והליכה ייחודיים לדמויות
@@ -125,6 +129,14 @@ typedef struct {
     u8 specialAcc; // 0=כובע, 1=כתר, 2=מצנפת קוסם, 3=קרניים, 4=הילה, 5=קסדה, 6=מסכה
 } CharData;
 
+// מבנה הדמות בהרכבה אישית שנשמרת לנצח בחנות!
+typedef struct {
+    char nameHeb[24];
+    u8 partStyle[8]; // 0=פנים, 1=זקן, 2=עיניים, 3=גוף, 4=ידיים, 5=רגליים, 6=נעליים, 7=כובעים (200 אפשרויות לכל קטגוריה!)
+    u8 partColor[8]; // 64 צבעים לבחירה לכל איבר!
+    bool created;
+} CustomCharData;
+
 typedef struct {
     float x, y;
     float dy;
@@ -176,7 +188,7 @@ extern int bestBiomeIdx;       // הביומה הכי רחוקה שהשחקן ה
 extern int totalGamesPlayed;   // סך כל המשחקים ששוחקו!
 extern int coinsCount;
 extern int selectedCharIdx;
-extern bool unlockedChars[NUM_CHARS];
+extern bool unlockedChars[ TOTAL_SHOP_CHARS ];
 extern int currentBiomeIdx;
 extern int frames;
 extern float currentSpeed;
@@ -188,6 +200,12 @@ extern const char* bubbleText;
 extern const char* currentRoastText;
 extern const char* currentWarningText; // הודעת האזהרה הספציפית לאויב במסך התחתון!
 extern enum ObsType lastDeathObs;
+
+// משתני ההרכבה האישית והמשימות הזמניות
+extern CustomCharData customChar;
+extern u32 unlockedCustomRewards;
+extern int currentMissionId;
+extern bool currentMissionDone;
 
 // משתנים גלובליים ל-4 האנימציות, הבעות הפנים ומעבר הביומות ההדרגתי
 extern enum CharAnimState playerAnimState;
@@ -201,9 +219,19 @@ extern float smoothGround[3];
 extern const BiomeData BIOMES[NUM_BIOMES];
 extern const CharData CHARACTERS[NUM_CHARS];
 
-// פונקציות שמירה וטעינה קבועה של כל השיאים והדמויות
+// פונקציות שמירה וטעינה קבועה של כל השיאים, הדמויות והדמות האישית
 void savePermanentData(void);
 void loadPermanentData(void);
+int getRequiredBiomeForChar(int cIdx);
+
+// פונקציות ההרכבה האישית והמשימות (בקובץ custom_char.c)
+void initDefaultCustomChar(void);
+void pickNewTempMission(void);
+const char* getActiveMissionDesc(void);
+void checkMissionAndRecordUnlocks(int dispScore, int biomeIdx, bool brokeRecord);
+void drawCustomCharacterSprite(u16* buf, int cx, int cy, int scalePct, enum CharAnimState animState, enum FaceExpr faceExpr, int frameCnt);
+void renderCustomizerScreen(u16* buf);
+void handleCustomizerTouch(int tx, int ty);
 
 // פונקציות עזר וציור
 u16 rgb8To16(int r, int g, int b);
